@@ -1,0 +1,24 @@
+[project]
+name = "analystforge-providers"
+version = "0.1.0"
+description = "Swappable market, fundamentals, filings, macro, FX and news data adapters for AnalystForge"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28.1",
+  "tenacity>=9.0.0",
+  "pandas>=2.2.3",
+  "feedparser>=6.0.11",
+  "trafilatura>=2.0.0",
+  "pypdf>=5.1.0",
+]
+
+[project.optional-dependencies]
+yahoo = ["yfinance>=0.2.50"]
+all = ["yfinance>=0.2.50"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

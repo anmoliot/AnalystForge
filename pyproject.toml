@@ -1,0 +1,103 @@
+[project]
+name = "analystforge-workspace"
+version = "0.1.0"
+description = "AnalystForge - professional finance analyst platform (workspace root)"
+requires-python = ">=3.12,<3.14"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["packages/quant", "packages/providers", "packages/sdk-python", "apps/api", "apps/worker"]
+
+[tool.uv.sources]
+analystforge-quant = { workspace = true }
+analystforge-providers = { workspace = true }
+analystforge-api = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.4",
+  "pytest-asyncio>=0.24.0",
+  "pytest-cov>=6.0.0",
+  "hypothesis>=6.122.0",
+  "ruff>=0.8.4",
+  "mypy>=1.14.0",
+  "pandas-stubs>=2.2.3",
+  "freezegun>=1.5.1",
+  "respx>=0.22.0",
+  "httpx>=0.28.1",
+  "types-python-dateutil>=2.9.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["packages/quant/tests", "packages/providers/tests", "apps/api/tests", "tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+  "network: tests that require live internet access (deselected by default)",
+  "slow: long-running tests",
+]
+filterwarnings = [
+  "error::DeprecationWarning:analystforge.*",
+]
+
+[tool.coverage.run]
+source = ["analystforge"]
+branch = true
+omit = ["*/tests/*", "*/migrations/*", "*/worker/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@abstractmethod",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["packages", "apps"]
+exclude = ["**/migrations/versions/*", "apps/web", "**/node_modules", "**/.venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "ASYNC", "S", "DTZ", "T20", "PT", "RUF"]
+ignore = [
+  "S101",      # asserts are used in tests
+  "B008",      # FastAPI Depends() in defaults is idiomatic
+  "RUF001",    # unicode punctuation in prose
+  "RUF002",
+  "RUF003",
+  "E501",      # line length handled by formatter
+  "SIM108",    # ternary readability is context dependent
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["analystforge", "analystforge_sdk"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "PT011", "T20", "ASYNC"]
+"**/conftest.py" = ["S"]
+"scripts/**" = ["T20", "S"]
+"**/worker/**" = ["T20"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+exclude = ["migrations/versions", "node_modules", "\\.venv"]
+files = ["packages/quant/src"]
+
+[[tool.mypy.overrides]]
+module = ["statsmodels.*", "arch.*", "cvxpy.*", "scipy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["analystforge.providers.*", "analystforge.api.*"]
+ignore_missing_imports = true

@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python lint, types, tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: analystforge
+          POSTGRES_PASSWORD: analystforge_test
+          POSTGRES_DB: analystforge_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ENVIRONMENT: test
+      SECRET_KEY: ci-secret-key-that-is-long-enough-for-validation-32
+      ENCRYPTION_KEY: 5nH1r0LzRk0m3xE4zQ9k7aLbV0uJ8Yw2cT6pS1dF3gM=
+      DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_test
+      TEST_DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_test
+      REDIS_URL: redis://localhost:6379/0
+      LOG_JSON: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --all-packages
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Mypy strict (quant)
+        run: uv run mypy packages/quant/src
+      - name: Migrations
+        run: uv run alembic -c apps/api/alembic.ini upgrade head
+      - name: Pytest
+        run: uv run pytest --cov=analystforge --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  web:
+    name: Web lint, types, tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: [python, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          push: false
+          tags: analystforge-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          tags: analystforge-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

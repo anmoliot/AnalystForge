@@ -1,0 +1,40 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+apps/web/dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+blob-report/
+
+# Environment and secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Local data and artifacts
+var/
+data/
+*.db
+*.sqlite3
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+!.vscode/extensions.json

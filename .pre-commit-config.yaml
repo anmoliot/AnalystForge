@@ -1,0 +1,36 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy-quant
+        name: mypy strict (quant)
+        entry: uv run mypy packages/quant/src
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: web-lint
+        name: eslint + tsc
+        entry: sh -c "cd apps/web && npm run lint && npm run typecheck"
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false

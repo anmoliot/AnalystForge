@@ -1,0 +1,148 @@
+name: analystforge
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-development}
+  DEBUG: ${DEBUG:-false}
+  SECRET_KEY: ${SECRET_KEY:?Run 'make env' to generate SECRET_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-analystforge}:${POSTGRES_PASSWORD:?Run 'make env' to generate POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-analystforge}
+  REDIS_URL: redis://redis:6379/0
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+  SEC_USER_AGENT: ${SEC_USER_AGENT:-AnalystForge/0.1 (contact@example.com)}
+  FRED_API_KEY: ${FRED_API_KEY:-}
+  ALPHAVANTAGE_API_KEY: ${ALPHAVANTAGE_API_KEY:-}
+  TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
+  POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+  FMP_API_KEY: ${FMP_API_KEY:-}
+  NEWSAPI_API_KEY: ${NEWSAPI_API_KEY:-}
+  LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+  FINBERT_ENABLED: ${FINBERT_ENABLED:-false}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+  EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_FROM: ${SMTP_FROM:-AnalystForge <alerts@analystforge.local>}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  OTEL_ENABLED: ${OTEL_ENABLED:-false}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_JSON: ${LOG_JSON:-true}
+  DEMO_MODE: ${DEMO_MODE:-false}
+  DATA_DIR: /app/var
+  UPLOAD_DIR: /app/var/uploads
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-analystforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run 'make env' to generate POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-analystforge}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [backend]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/var
+    expose: ["8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [backend, frontend]
+    command:
+      - sh
+      - -c
+      - alembic -c apps/api/alembic.ini upgrade head && uvicorn analystforge.api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/var
+    networks: [backend]
+    command: ["arq", "analystforge.worker.main.WorkerSettings"]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    expose: ["80"]
+    networks: [frontend]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [api, web]
+    networks: [frontend, backend]
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks: [backend]
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_data:
+
+networks:
+  backend:
+    internal: false
+  frontend:

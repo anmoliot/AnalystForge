@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="dark"] {
+  --canvas: 11 14 17;
+  --panel: 17 21 26;
+  --elevated: 23 29 36;
+  --line: 35 42 51;
+  --ink: 230 237 243;
+  --muted: 139 151 165;
+  --accent: 76 194 166;
+  --accent-ink: 5 20 17;
+  --positive: 63 185 80;
+  --negative: 248 81 73;
+  --warning: 227 179 65;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --canvas: 246 247 249;
+  --panel: 255 255 255;
+  --elevated: 250 251 253;
+  --line: 216 222 231;
+  --ink: 17 24 39;
+  --muted: 100 116 139;
+  --accent: 14 124 107;
+  --accent-ink: 255 255 255;
+  --positive: 22 130 93;
+  --negative: 190 40 40;
+  --warning: 161 120 10;
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-base text-ink antialiased;
+    font-feature-settings:
+      "ss01" on,
+      "cv11" on;
+    min-width: 320px;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.28);
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line));
+    border-radius: 9999px;
+    border: 2px solid rgb(var(--canvas));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--muted) / 0.6);
+  }
+}
+
+@layer components {
+  .num {
+    @apply font-mono tabular-nums;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  .panel {
+    @apply rounded-md border border-line bg-panel;
+  }
+
+  .panel-header {
+    @apply flex h-9 items-center justify-between border-b border-line px-3;
+  }
+
+  .panel-title {
+    @apply text-2xs font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+
+  .kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-line bg-elevated px-1.5 font-mono text-2xs text-muted;
+  }
+
+  .data-row {
+    @apply border-b border-line/60 last:border-0;
+  }
+
+  .link {
+    @apply text-accent underline-offset-2 hover:underline;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-line/60;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
