@@ -5,9 +5,12 @@ from pathlib import Path
 
 import httpx
 import pytest_asyncio
+from fastapi import FastAPI
 from pydantic import SecretStr
 
+from analystforge.api import models  # noqa: F401  # registers every table on Base.metadata
 from analystforge.api.config import Settings
+from analystforge.api.db import Base, Database
 from analystforge.api.main import create_app
 
 
@@ -29,9 +32,22 @@ def make_settings(tmp_path: Path) -> Settings:
 
 
 @pytest_asyncio.fixture
-async def client(tmp_path: Path) -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app(make_settings(tmp_path))
-    async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as http:
-            yield http
+async def app(tmp_path: Path) -> AsyncIterator[FastAPI]:
+    application = create_app(make_settings(tmp_path))
+    async with application.router.lifespan_context(application):
+        async with application.state.db.engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        yield application
+
+
+@pytest_asyncio.fixture
+async def db(app: FastAPI) -> Database:
+    database: Database = app.state.db
+    return database
+
+
+@pytest_asyncio.fixture
+async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as http:
+        yield http

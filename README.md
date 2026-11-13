@@ -20,7 +20,7 @@ workspace: sourced data, tested formulas, versioned models and AI research that 
 Every metric is traceable to its provider, as-of time and formula. There is no random or
 placeholder data in analysis paths; missing data is shown as unavailable with the reason.
 
-![AnalystForge workspace, dark theme](docs/screenshots/phase0-home-dark.png)
+![AnalystForge workspace with live data coverage and provider health](docs/screenshots/phase1-home-dark.png)
 
 ## Quick start (Docker)
 
@@ -47,6 +47,33 @@ Then load real data:
 make ingest
 ```
 
+## Data providers and ingestion
+
+The default stack needs no paid keys. Prices come from Yahoo's chart API, fundamentals from SEC
+EDGAR XBRL companyfacts, macro series from FRED CSV, FX from ECB reference rates and news from
+public RSS feeds. Stooq is configured as a secondary price adapter; provider failover is recorded
+in `provider_health` and shown on the workspace overview.
+
+```bash
+make seed                    # exchanges, instruments and provider symbols
+make ingest-local            # prices, fundamentals, macro, FX and news against DATABASE_URL
+make quality                 # structural checks; exits non-zero on errors
+```
+
+The same commands run inside the stack with `make ingest`. Provider order and keys live in `.env`
+(`PRICE_PROVIDERS`, `NEWS_RSS_FEEDS`, `SEC_USER_AGENT`, optional paid keys). Adapters that require
+keys are tested against recorded fixtures and stay disabled until a key is present.
+
+Inspect what was actually persisted:
+
+- `GET /api/v1/data/coverage` — instruments, bars, facts, macro points, FX and news by exchange
+- `GET /api/v1/providers/health` — latest attempt per adapter, including errors and cooldowns
+- `GET /api/v1/data/quality` — missing/stale coverage and vendor anomalies with severity
+
+Missing values stay missing. The platform never fills gaps with zeroes or placeholder prices.
+Warnings (for example, vendor OHLC bound violations) retain the raw data and are surfaced with their
+instrument and date.
+
 ## Local development (without Docker)
 
 Prerequisites: Python 3.12, Node 22, [uv](https://docs.astral.sh/uv/), PostgreSQL 16+
@@ -59,6 +86,7 @@ createdb analystforge        # or use the connection string in .env
 make migrate                 # apply Alembic migrations
 make dev-api                 # API on :8000
 make dev-web                 # Vite on :5173 (proxies /api to :8000)
+make seed && make ingest-local   # load real reference and market data
 ```
 
 ## Tests and quality gates

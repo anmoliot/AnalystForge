@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 .DEFAULT_GOAL := help
 .PHONY: help env up down restart logs ps build migrate revision test test-python test-web e2e \
 	lint lint-python lint-web typecheck format coverage bootstrap dev-api dev-web shell psql \
-	redis-cli sdk-test ingest seed-demo backup restore clean
+	redis-cli sdk-test seed ingest ingest-local quality backup restore clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -99,11 +99,17 @@ redis-cli: ## Open redis-cli in the compose Redis
 sdk-test: ## Run Python SDK integration tests against a running API
 	$(UV) run pytest packages/sdk-python/tests -m "sdk or not sdk"
 
-ingest: ## Run the default ingestion job manually
-	$(COMPOSE) exec api python -m analystforge.worker.cli ingest-all
+seed: ## Seed the exchange and instrument reference universe
+	$(UV) run analystforge-data seed
 
-seed-demo: ## Load the clearly-labelled demo dataset (never used by default)
-	$(COMPOSE) exec api python -m analystforge.worker.cli seed-demo
+ingest: ## Run every ingestion job inside the running stack
+	$(COMPOSE) exec api analystforge-data ingest-all
+
+ingest-local: ## Run every ingestion job natively against DATABASE_URL
+	$(UV) run analystforge-data ingest-all
+
+quality: ## Run data-quality checks and exit non-zero on errors
+	$(UV) run analystforge-data quality
 
 backup: ## Dump the database to var/backups
 	./scripts/backup.sh

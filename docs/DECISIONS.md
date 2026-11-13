@@ -187,3 +187,48 @@ where it cannot be executed locally.
 **Consequences:** Real API/database/UI integration is tested locally; container orchestration has
 build-level verification plus a documented manual checklist. This is recorded in
 KNOWN_LIMITATIONS until a Docker-capable host runs the full path.
+
+## ADR-013 — Keyless provider defaults and normalisation on write
+
+**Status:** Accepted
+
+**Context:** Phase 1 must load real prices, fundamentals, macro, FX and news without requiring paid
+keys. Candidate free sources differ in reliability, currency conventions and response shape. Stooq
+was initially the intended keyless price source but its CSV endpoint now returns a browser
+challenge to non-browser clients. Yahoo's chart endpoint remains keyless and returns adjusted bars
+for LSE, NASDAQ and XETRA listings, but quotes LSE stocks in pence.
+
+**Decision:** Default to the Yahoo chart API for prices, SEC EDGAR companyfacts/submissions for
+fundamentals, FRED CSV for macro, ECB reference rates for FX and public RSS feeds for news. Keep
+Stooq as a secondary price adapter and demonstrate failover when the primary errors. Normalise on
+write: vendor `GBp`/`GBX` quotes and dividends are multiplied by `0.01` and stored as `GBP`; daily
+bars are stored at midnight UTC; missing provider values remain `NULL` rather than zero. All writes
+are idempotent upserts on natural keys. Incremental price runs refetch from the latest stored bar
+minus seven days to absorb late vendor corrections; `--full` explicitly refetches the configured
+history window.
+
+**Consequences:** The platform works out of the box without keys and can prove failover with a
+second adapter. Yahoo and Stooq are unofficial and their terms constrain redistribution
+(DATA_LICENSING). The seven-day overlap adds a small amount of repeated work but avoids permanent
+gaps from late corrections. Currency scaling happens once at ingestion, so analysis and reporting
+never mix pence and pounds.
+
+## ADR-014 — Data-quality severity and vendor anomalies
+
+**Status:** Accepted
+
+**Context:** Live vendor data is imperfect. During Phase 1 verification, 27 LSE bars in the Yahoo
+payload violated OHLC bounds (for example, the 2024-05-01 SHEL.L bar had `open=2875.0` but
+`high=2817.5`). Rewriting or dropping those bars would silently alter source data; treating every
+anomaly as fatal would make the honest data set unusable.
+
+**Decision:** Quality checks report structural failures (missing instruments, stale coverage,
+missing fundamentals, absent price history) as `error` and cause a `fail` status. Vendor OHLC bound
+violations are reported as `warning` with the affected instrument and first day, and the raw bars
+are retained unchanged. Warnings never flip the overall status to `fail`; errors do. Every finding
+carries a code, severity, message, instrument and optional day so the UI and API can explain it.
+
+**Consequences:** Analysts see exactly which vendor rows are suspect and can verify them against a
+primary source. The platform never fabricates a correction or hides an anomaly. A future
+provider-specific repair workflow must be explicit and auditable rather than silently normalising
+vendor errors.

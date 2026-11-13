@@ -14,7 +14,7 @@ flowchart LR
     Worker --> Redis
     Worker --> Providers
     API --> Providers[Market / Fundamentals / Macro / News adapters]
-    Providers --> Internet[(Stooq, Yahoo, SEC EDGAR, FRED, ECB, RSS)]
+    Providers --> Internet[(Yahoo, Stooq, SEC EDGAR, FRED, ECB, RSS)]
     API --> LLM[LLM provider / local FinBERT]
 ```
 
@@ -72,15 +72,20 @@ for local development.
 
 ### Market data ingestion
 
-1. The worker resolves the instrument universe and asks a `MarketDataProvider` for the date range.
-2. The adapter fetches with retries and backoff, normalises to a common bar schema and returns
-   provenance (`provider`, `retrieved_at`, `adjustment`).
-3. A data-quality pass detects gaps, duplicates, non-positive prices, extreme returns and stale
-   data, then assigns a quality score.
-4. Rows are upserted into `price_bars`; failures write provider health events instead of
-   substituting synthetic values.
-5. Provider failover tries the next adapter only when the failure is transient or the primary has
-   no coverage; the response records which provider actually served the data.
+1. The seed service upserts the curated exchange, instrument and provider-symbol universe.
+2. The ingestion service resolves the instrument universe and asks a `MarketDataProvider` for the
+   date range. Incremental runs start at the latest stored bar minus seven days; full runs refetch
+   the configured window.
+3. The adapter fetches through the shared HTTPS client with caching, retries/backoff and rate
+   limiting, normalises to a common bar schema and returns provenance (`provider`, retrieved time,
+   adjustments). Vendor pence quotes are converted to pounds on write.
+4. A data-quality pass detects missing references, stale or absent coverage, non-positive prices,
+   extreme returns and vendor OHLC bound violations, and records findings with a severity. Missing
+   values are never zero-filled or replaced with synthetic data.
+5. Rows are upserted on natural keys into `price_bars` (and the corresponding reference tables);
+   every provider attempt, including failures, is persisted in `provider_health`.
+6. The provider router fails over to the next configured adapter and records which provider actually
+   served the data. Cooldowns move failing adapters behind healthy alternatives.
 
 ### Fundamentals
 

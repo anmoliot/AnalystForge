@@ -62,8 +62,14 @@ class Settings(BaseSettings):
     fmp_api_key: SecretStr | None = None
     newsapi_api_key: SecretStr | None = None
 
-    market_data_primary: str = "stooq"
-    market_data_fallbacks: str = "yahoo"
+    price_providers: str = "yahoo,stooq"
+    news_rss_feeds: str = (
+        "https://www.sec.gov/news/pressreleases.rss,"
+        "https://www.federalreserve.gov/feeds/press_all.xml,"
+        "https://www.ecb.europa.eu/rss/press.html"
+    )
+    provider_cooldown_seconds: float = Field(default=300.0, ge=0, le=3600)
+    price_history_years: int = Field(default=10, ge=1, le=30)
 
     llm_provider: Literal["none", "anthropic", "openai"] = "anthropic"
     anthropic_api_key: SecretStr | None = None
@@ -143,8 +149,12 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     @property
-    def market_fallback_list(self) -> list[str]:
-        return [item.strip() for item in self.market_data_fallbacks.split(",") if item.strip()]
+    def price_provider_list(self) -> list[str]:
+        return [item.strip() for item in self.price_providers.split(",") if item.strip()]
+
+    @property
+    def news_feed_list(self) -> list[str]:
+        return [item.strip() for item in self.news_rss_feeds.split(",") if item.strip()]
 
     @property
     def is_sqlite(self) -> bool:

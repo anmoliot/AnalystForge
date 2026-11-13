@@ -84,7 +84,7 @@ export interface MetaResponse {
   api_version: string;
   docs_url: string;
   disclaimer: string;
-  capabilities: Record<string, boolean | string>;
+  capabilities: Record<string, boolean | string | Record<string, string | null>>;
 }
 
 export interface ReadyResponse {
@@ -93,7 +93,61 @@ export interface ReadyResponse {
   checks: Record<string, { status: string; latency_ms?: number; error?: string }>;
 }
 
+export interface ExchangeCoverage {
+  code: string;
+  name: string;
+  country: string;
+  currency: string;
+  instruments: number;
+  priced_instruments: number;
+  bars: number;
+  first_day: string | null;
+  last_day: string | null;
+}
+
+export interface DataCoverage {
+  generated_at: string;
+  exchanges: ExchangeCoverage[];
+  prices: { instruments: number; bars: number; first_day: string | null; last_day: string | null };
+  fundamentals: {
+    instruments: number;
+    facts: number;
+    filings: number;
+    latest_period_end: string | null;
+  };
+  macro: { series: number; observations: number; latest_day: string | null };
+  fx: { rates: number; pairs: number; first_day: string | null; last_day: string | null };
+  news: { articles: number; latest_published: string | null };
+  jobs: Array<{
+    id: string;
+    job_name: string;
+    status: string;
+    items_processed: number;
+    started_at: string;
+    finished_at: string | null;
+    error: string | null;
+  }>;
+}
+
+export interface ProviderHealthRow {
+  provider: string;
+  capability: string;
+  configured: boolean;
+  status: string;
+  latency_ms: number | null;
+  error: string | null;
+  checked_at: string | null;
+  source?: string;
+}
+
+export interface ProviderHealthResponse {
+  generated_at: string;
+  providers: ProviderHealthRow[];
+}
+
 export const queries = {
   meta: () => api.get<MetaResponse>("/api/v1/meta"),
   ready: () => api.get<ReadyResponse>("/ready"),
+  coverage: () => api.get<DataCoverage>("/api/v1/data/coverage"),
+  providerHealth: () => api.get<ProviderHealthResponse>("/api/v1/providers/health"),
 };

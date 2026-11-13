@@ -20,3 +20,23 @@ export function useReadiness() {
     staleTime: 10_000,
   });
 }
+
+export function useCoverage() {
+  return useQuery({
+    queryKey: ["coverage"],
+    queryFn: queries.coverage,
+    refetchInterval: 60_000,
+    retry: 1,
+    staleTime: 30_000,
+  });
+}
+
+export function useProviderHealth() {
+  return useQuery({
+    queryKey: ["provider-health"],
+    queryFn: queries.providerHealth,
+    refetchInterval: 60_000,
+    retry: 1,
+    staleTime: 30_000,
+  });
+}

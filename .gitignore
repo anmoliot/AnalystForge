@@ -28,6 +28,7 @@ blob-report/
 # Local data and artifacts
 var/
 data/
+.tmp/
 *.db
 *.sqlite3
 *.log

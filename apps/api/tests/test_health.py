@@ -82,4 +82,9 @@ async def test_meta_reports_disclaimer_and_capabilities(client: httpx.AsyncClien
     assert "not investment advice" in body["disclaimer"].lower()
     assert body["capabilities"]["llm_provider"] == "none"
     assert body["capabilities"]["redis"] is False
-    assert body["capabilities"]["market_data"] is False
+    assert body["capabilities"]["market_data"] is True
+    assert body["capabilities"]["fundamentals"] is True
+    assert body["capabilities"]["macro"] is True
+    assert body["capabilities"]["fx"] is True
+    assert body["capabilities"]["news"] is True
+    assert body["capabilities"]["primary_providers"]["prices"] == "yahoo"

@@ -10,8 +10,8 @@ advice.
 | FRED (St. Louis Fed) | Public | Optional API key | Series may be sourced from third parties; check individual series notes. Attribution to FRED required. |
 | ECB Data Portal | Public | None | Attribution required. |
 | World Bank Open Data | Public | None | CC BY 4.0 generally; check indicator metadata. |
-| Stooq | Public CSV endpoints | None | Best-effort, unofficial. Commercial use requires checking Stooq terms. |
-| Yahoo Finance via yfinance | Public | None | Unofficial and best-effort; Yahoo terms restrict redistribution/commercial use. Disabled by default in production without review. |
+| Stooq | Public CSV endpoints | None | Best-effort, unofficial. Currently serves a browser challenge to non-browser clients, so live fallback is blocked on the verification host. Commercial use requires checking Stooq terms. |
+| Yahoo Finance chart API | Public | None | Unofficial and best-effort; Yahoo terms restrict redistribution/commercial use. Used as the keyless development default; production deployment requires a terms review. Quotes may be delayed. |
 | Alpha Vantage | API | Yes | Free tier limits; redistribution restrictions apply. |
 | Twelve Data | API | Yes | Plan-dependent licensing. |
 | Polygon.io | API | Yes | Paid plan; exchange licensing may restrict display/redistribution. |
@@ -21,7 +21,7 @@ advice.
 | RSS feeds / company IR pages | Public | None | Article text remains the publisher's copyright. Store for internal research; do not redistribute full text. |
 | CoinGecko | API | Optional key | Attribution required; rate limits apply. |
 | Ken French Data Library | Public | None | Fama-French factors; cite the source. |
-| exchangerate.host / ECB FX | Public | Optional | Check terms; ECB reference rates are informational. |
+| exchangerate.host / ECB FX | Public | Optional | Check terms; ECB reference rates are informational. Phase 1 defaults to ECB reference rates. |
 
 ## Storage and redistribution
 

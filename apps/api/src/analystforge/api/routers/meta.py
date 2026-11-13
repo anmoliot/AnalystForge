@@ -18,7 +18,8 @@ DISCLAIMER = (
 @router.get("/meta", summary="Service metadata and data capabilities")
 async def meta(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
-    providers: dict[str, str] = getattr(request.app.state, "providers", None) or {}
+    registry = getattr(request.app.state, "provider_registry", None)
+    providers: dict[str, str | None] = registry.primary_map() if registry else {}
     return {
         "name": settings.app_name,
         "version": settings.version,
@@ -28,10 +29,12 @@ async def meta(request: Request) -> dict[str, Any]:
         "docs_url": "/docs",
         "disclaimer": DISCLAIMER,
         "capabilities": {
-            "market_data": bool(providers.get("market_data")),
+            "market_data": bool(providers.get("prices")),
             "fundamentals": bool(providers.get("fundamentals")),
             "macro": bool(providers.get("macro")),
+            "fx": bool(providers.get("fx")),
             "news": bool(providers.get("news")),
+            "primary_providers": providers,
             "llm_provider": settings.llm_provider
             if settings.provider_key(settings.llm_provider)
             else "none",

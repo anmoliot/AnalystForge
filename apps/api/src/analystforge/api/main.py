@@ -23,6 +23,7 @@ from analystforge.api.health import router as ops_router
 from analystforge.api.logging import configure_logging
 from analystforge.api.middleware import RequestContextMiddleware, ResponseHeadersMiddleware
 from analystforge.api.routers import api_router
+from analystforge.api.services.runtime import build_app_registry
 
 logger = structlog.get_logger("app")
 
@@ -94,12 +95,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if settings.redis_url
             else None
         )
+        app.state.provider_registry = build_app_registry(settings, app.state.redis)
         logger.info(
             "app.started",
             version=settings.version,
             environment=settings.environment,
             demo_mode=settings.demo_mode,
             redis_configured=bool(settings.redis_url),
+            primary_providers=app.state.provider_registry.primary_map(),
         )
         if not settings.redis_url:
             logger.warning(
@@ -109,6 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            await app.state.provider_registry.aclose()
             await app.state.db.dispose()
             if app.state.redis is not None:
                 await app.state.redis.aclose()
