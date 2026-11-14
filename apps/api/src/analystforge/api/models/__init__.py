@@ -4,7 +4,7 @@ Importing this package registers all tables on :class:`analystforge.api.db.Base`
 metadata so Alembic and ``create_all`` see the full schema.
 """
 
-from analystforge.api.models.core import AuditLog, Tenant, User
+from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, TOTPSecret, Tenant, User
 from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
 from analystforge.api.models.market import (
     CorporateAction,
@@ -18,6 +18,7 @@ from analystforge.api.models.ops import JobRun, ProviderHealthRecord
 from analystforge.api.models.research import Filing, FundamentalFact
 
 __all__ = [
+    "ApiKey",
     "AuditLog",
     "CorporateAction",
     "Exchange",
@@ -33,6 +34,8 @@ __all__ = [
     "NewsArticleInstrument",
     "PriceBar",
     "ProviderHealthRecord",
+    "RefreshToken",
+    "TOTPSecret",
     "Tenant",
     "User",
 ]

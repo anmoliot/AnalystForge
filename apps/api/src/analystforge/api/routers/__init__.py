@@ -2,8 +2,9 @@
 
 from fastapi import APIRouter
 
-from analystforge.api.routers import data, meta
+from analystforge.api.routers import auth, data, meta
 
 api_router = APIRouter()
 api_router.include_router(meta.router)
+api_router.include_router(auth.router)
 api_router.include_router(data.router)

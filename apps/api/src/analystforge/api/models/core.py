@@ -1,4 +1,4 @@
-"""Tenants, users and the append-only audit log."""
+"""Tenants, users, auth tokens and the append-only audit log."""
 
 from __future__ import annotations
 
@@ -38,6 +38,71 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    totp_secrets: Mapped[list[TOTPSecret]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    api_keys: Mapped[list[ApiKey]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class RefreshToken(Base):
+    """Hashed refresh tokens. Only one per user is kept active (family rotation)."""
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    family: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    is_revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(400))
+
+    user: Mapped[User] = relationship(back_populates="refresh_tokens")
+
+
+class TOTPSecret(Base):
+    """Encrypted TOTP secret for 2FA. At most one active per user."""
+
+    __tablename__ = "totp_secrets"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    encrypted_secret: Mapped[str] = mapped_column(Text, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="totp_secrets")
+
+
+class ApiKey(Base, TimestampMixin):
+    """Long-lived API keys for programmatic access."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(back_populates="api_keys")
 
 
 class AuditLog(Base):
