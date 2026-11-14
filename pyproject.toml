@@ -91,12 +91,19 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "packages/quant/src"
 exclude = ["migrations/versions", "node_modules", "\\.venv"]
 files = ["packages/quant/src"]
 
 [[tool.mypy.overrides]]
 module = ["statsmodels.*", "arch.*", "cvxpy.*", "scipy.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["cvxpy", "cvxpy.*"]
+follow_imports = "skip"
 
 [[tool.mypy.overrides]]
 module = ["analystforge.providers.*", "analystforge.api.*"]

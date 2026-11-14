@@ -24,6 +24,11 @@ blob-report/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.cert
+id_rsa*
+credentials.json
 
 # Local data and artifacts
 var/
