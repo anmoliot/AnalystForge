@@ -16,6 +16,7 @@ from analystforge.api.models.market import (
 from analystforge.api.models.news import NewsArticle, NewsArticleInstrument
 from analystforge.api.models.ops import JobRun, ProviderHealthRecord
 from analystforge.api.models.research import Filing, FundamentalFact
+from analystforge.api.models.valuation import ValuationModel, ValuationVersion
 
 __all__ = [
     "ApiKey",
@@ -38,4 +39,7 @@ __all__ = [
     "TOTPSecret",
     "Tenant",
     "User",
+    "ValuationModel",
+    "ValuationVersion",
 ]
+

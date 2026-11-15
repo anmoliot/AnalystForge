@@ -157,7 +157,72 @@ export const queries = {
   companyPeers: (ticker: string) => api.get<PeerItem[]>(`/api/v1/companies/${ticker}/peers`),
   companyFilings: (ticker: string) => api.get<FilingItem[]>(`/api/v1/companies/${ticker}/filings`),
   searchCompanies: (query: string) => api.get<Array<{ id: string; ticker: string; name: string }>>(`/api/v1/companies/search?query=${encodeURIComponent(query)}`),
+  runDcf: (payload: DCFPayload) => api.post<DCFOutput>("/api/v1/valuation/dcf", payload),
+  dcfSensitivity: (payload: DCFPayload) => api.post<SensitivityOutput>("/api/v1/valuation/dcf/sensitivity", payload),
+  dcfMonteCarlo: (payload: DCFPayload, iterations = 500) => api.post<MonteCarloOutput>(`/api/v1/valuation/dcf/montecarlo?iterations=${iterations}`, payload),
 };
+
+export interface DCFPayload {
+  ticker: string;
+  base_revenue: number;
+  revenue_growth: number[];
+  ebit_margin: number[];
+  tax_rate: number;
+  wacc: number;
+  terminal_growth: number;
+  shares_outstanding: number;
+  depreciation_pct_revenue?: number;
+  capex_pct_revenue?: number;
+  nwc_pct_incremental_revenue?: number;
+  net_debt?: number;
+  mid_year_convention?: boolean;
+}
+
+export interface DCFOutput {
+  enterprise_value: number;
+  equity_value: number;
+  value_per_share: number;
+  terminal_value: number;
+  terminal_value_pv: number;
+  terminal_value_pct: number;
+  sum_pv_fcff: number;
+  net_debt: number;
+  shares_outstanding: number;
+  warnings: string[];
+  forecast: Array<{
+    year: number;
+    revenue: number;
+    ebit: number;
+    ebitda?: number;
+    nopat: number;
+    depreciation: number;
+    capex: number;
+    nwc_change: number;
+    fcff: number;
+    discount_factor: number;
+    present_value: number;
+  }>;
+  formula?: string;
+}
+
+export interface SensitivityOutput {
+  wacc_axis: number[];
+  g_axis: number[];
+  matrix: Array<Array<number | null>>;
+}
+
+export interface MonteCarloOutput {
+  mean: number;
+  std: number;
+  p10: number;
+  p25?: number;
+  p50: number;
+  p75?: number;
+  p90: number;
+  min?: number;
+  max?: number;
+}
+
 
 export interface CompanyOverview {
   id: string;
