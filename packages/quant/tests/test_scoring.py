@@ -20,7 +20,7 @@ from analystforge.quant.statements import (
     normalize_statement,
 )
 
-from conftest import D, fact_for
+from quant_fixtures import D, fact_for
 
 FY = FiscalPeriod.FY.value
 

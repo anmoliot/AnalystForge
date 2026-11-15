@@ -19,7 +19,7 @@ from analystforge.quant.statements import (
     ttm_value,
 )
 
-from conftest import D, fact_for, make_statements
+from quant_fixtures import D, fact_for, make_statements
 
 FY = FiscalPeriod.FY.value
 
