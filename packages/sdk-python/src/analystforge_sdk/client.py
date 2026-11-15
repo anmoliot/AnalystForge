@@ -1,4 +1,4 @@
-"""Small, typed HTTP client for the public AnalystForge API."""
+"""Typed HTTP client for the public AnalystForge API (Phase 10)."""
 
 from __future__ import annotations
 
@@ -61,8 +61,84 @@ class AnalystForgeClient:
             return None
         return response.json()
 
+    # Core metadata & health
     def health(self) -> dict[str, Any]:
         return self.request("GET", "/health")
 
     def meta(self) -> dict[str, Any]:
         return self.request("GET", "/api/v1/meta")
+
+    # Equities & Financials
+    def get_company(self, ticker: str) -> dict[str, Any]:
+        return self.request("GET", f"/api/v1/companies/{ticker}")
+
+    def get_prices(self, ticker: str, start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {}
+        if start:
+            params["start"] = start
+        if end:
+            params["end"] = end
+        return self.request("GET", f"/api/v1/companies/{ticker}/prices", params=params)
+
+    # Screener
+    def run_screener(self, criteria: dict[str, Any]) -> dict[str, Any]:
+        return self.request("POST", "/api/v1/screener/run", json=criteria)
+
+    # Macro & FX
+    def get_yield_curve(self) -> dict[str, Any]:
+        return self.request("GET", "/api/v1/macro/yield-curve")
+
+    def get_fx_rates(self) -> list[dict[str, Any]]:
+        return self.request("GET", "/api/v1/macro/fx")
+
+    # Backtesting
+    def run_backtest(
+        self,
+        ticker: str,
+        strategy: str = "SMA_CROSSOVER",
+        start_date: str = "2024-01-01",
+        end_date: str = "2024-11-01",
+        initial_capital: float = 100_000.0,
+        parameters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "strategy_name": strategy,
+            "ticker": ticker,
+            "start_date": start_date,
+            "end_date": end_date,
+            "initial_capital": initial_capital,
+            "parameters": parameters or {},
+        }
+        return self.request("POST", "/api/v1/backtest/run", json=payload)
+
+    # Grounded Research & RAG
+    def query_research(self, query: str, ticker: str | None = None) -> dict[str, Any]:
+        return self.request(
+            "POST",
+            "/api/v1/research/query",
+            json={"query": query, "ticker": ticker},
+        )
+
+    # Reporting
+    def generate_report(
+        self,
+        title: str,
+        report_type: str = "TEARSHEET",
+        ticker: str | None = None,
+        format: str = "MARKDOWN",
+        parameters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "title": title,
+            "report_type": report_type,
+            "ticker": ticker,
+            "format": format,
+            "parameters": parameters or {},
+        }
+        return self.request("POST", "/api/v1/reports/generate", json=payload)
+
+    def list_reports(self) -> list[dict[str, Any]]:
+        return self.request("GET", "/api/v1/reports")
+
+    def get_report(self, report_id: str) -> dict[str, Any]:
+        return self.request("GET", f"/api/v1/reports/{report_id}")

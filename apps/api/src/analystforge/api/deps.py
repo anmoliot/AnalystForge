@@ -141,6 +141,9 @@ async def get_current_user_optional(
     return await _user_from_bearer(request, authorization, session, settings)
 
 
+CurrentUserOptional = Annotated[User | None, Depends(get_current_user_optional)]
+
+
 # ---------------------------------------------------------------------------
 # RBAC
 # ---------------------------------------------------------------------------
