@@ -150,4 +150,82 @@ export const queries = {
   ready: () => api.get<ReadyResponse>("/ready"),
   coverage: () => api.get<DataCoverage>("/api/v1/data/coverage"),
   providerHealth: () => api.get<ProviderHealthResponse>("/api/v1/providers/health"),
+  company: (ticker: string) => api.get<CompanyOverview>(`/api/v1/companies/${ticker}`),
+  companyPrices: (ticker: string) => api.get<PriceBar[]>(`/api/v1/companies/${ticker}/prices`),
+  companyStatements: (ticker: string) => api.get<StatementData>(`/api/v1/companies/${ticker}/statements`),
+  companyRatios: (ticker: string) => api.get<RatioItem[]>(`/api/v1/companies/${ticker}/ratios`),
+  companyPeers: (ticker: string) => api.get<PeerItem[]>(`/api/v1/companies/${ticker}/peers`),
+  companyFilings: (ticker: string) => api.get<FilingItem[]>(`/api/v1/companies/${ticker}/filings`),
+  searchCompanies: (query: string) => api.get<Array<{ id: string; ticker: string; name: string }>>(`/api/v1/companies/search?query=${encodeURIComponent(query)}`),
 };
+
+export interface CompanyOverview {
+  id: string;
+  ticker: string;
+  name: string;
+  exchange_code: string;
+  exchange_name: string;
+  currency: string;
+  asset_type: string;
+  cik: string | null;
+  sector: string | null;
+  industry: string | null;
+  description: string | null;
+  latest_price: number | null;
+  latest_price_date: string | null;
+  change_pct: number | null;
+  high_52w: number | null;
+  low_52w: number | null;
+  market_cap: number | null;
+  volume: number | null;
+}
+
+export interface PriceBar {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjusted_close: number;
+  volume: number;
+}
+
+export interface RatioItem {
+  key: string;
+  label: string;
+  category: string;
+  value: number | null;
+  unit: string;
+  formula: string;
+  inputs: Record<string, number | string | null>;
+  note: string | null;
+}
+
+export interface PeerItem {
+  id: string;
+  ticker: string;
+  name: string;
+  exchange: string;
+  sector: string | null;
+  industry: string | null;
+  currency: string;
+  price: number | null;
+}
+
+export interface FilingItem {
+  id: string;
+  form: string;
+  filed_date: string;
+  period_of_report: string | null;
+  primary_document: string;
+  document_url: string;
+}
+
+export interface StatementData {
+  ticker: string;
+  currency: string;
+  income: Array<{ fiscal_year: number; period: string; values: Record<string, number> }>;
+  balance: Array<{ fiscal_year: number; period: string; values: Record<string, number> }>;
+  cashflow: Array<{ fiscal_year: number; period: string; values: Record<string, number> }>;
+}
+
