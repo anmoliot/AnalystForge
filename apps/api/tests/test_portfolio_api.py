@@ -2,12 +2,63 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 import io
 import uuid
 import httpx
 import pytest
+from sqlalchemy import select
 
 from analystforge.api.db import Database
+from analystforge.api.models.market import Exchange, Instrument, PriceBar
+
+
+async def _seed_portfolio_prices(db: Database, tickers: list[str]) -> None:
+    async with db.session() as session:
+        ex = await session.get(Exchange, "NASDAQ")
+        if not ex:
+            session.add(Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD"))
+            await session.flush()
+
+        for ticker in tickers:
+            inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+            if not inst:
+                inst = Instrument(
+                    id=uuid.uuid4(),
+                    exchange_code="NASDAQ",
+                    ticker=ticker,
+                    name=f"{ticker} Inc.",
+                    asset_type="equity",
+                    currency="USD",
+                    sector="Technology",
+                    is_active=True,
+                )
+                session.add(inst)
+                await session.flush()
+
+            # Seed 30 daily price bars with distinct variations per ticker
+            start_dt = datetime(2024, 1, 1, tzinfo=UTC)
+            ticker_mult = {"AAPL": 0.8, "MSFT": 1.4, "GOOGL": 0.5, "AMZN": 1.1}.get(ticker, 1.0)
+            base_p = {"AAPL": 150.0, "MSFT": 350.0, "GOOGL": 140.0, "AMZN": 170.0}.get(ticker, 100.0)
+            for i in range(30):
+                dt = start_dt + timedelta(days=i)
+                noise = ((i % 5) - 2) * 0.7 * ticker_mult
+                val = Decimal(str(round(base_p + (i * 0.5 * ticker_mult) + noise, 2)))
+                bar = PriceBar(
+                    instrument_id=inst.id,
+                    interval="1d",
+                    ts=dt,
+                    open=val,
+                    high=val + Decimal("2.00"),
+                    low=val - Decimal("2.00"),
+                    close=val + Decimal("0.20"),
+                    adjusted_close=val + Decimal("0.20"),
+                    volume=1000000,
+                    provider="yahoo",
+                )
+                session.add(bar)
+        await session.commit()
 
 
 @pytest.fixture
@@ -200,7 +251,7 @@ async def test_csv_transaction_import(
 
 @pytest.mark.asyncio
 async def test_portfolio_risk_analytics_and_stress_test(
-    client: httpx.AsyncClient, auth_headers: dict[str, str]
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
 ) -> None:
     # 1. Create portfolio with multiple assets
     port = (
@@ -225,7 +276,15 @@ async def test_portfolio_risk_analytics_and_stress_test(
             },
         )
 
-    # 2. Risk endpoint
+    # 2. Verify explicit 422 DataUnavailable state before price ingestion
+    unavail_resp = await client.get(f"/api/v1/portfolios/{port_id}/risk", headers=auth_headers)
+    assert unavail_resp.status_code == 422
+    assert unavail_resp.json()["error"]["code"] == "data_unavailable"
+
+    # Seed real price history
+    await _seed_portfolio_prices(db, ["AAPL", "MSFT", "AMZN"])
+
+    # 3. Risk endpoint with real prices
     risk_resp = await client.get(f"/api/v1/portfolios/{port_id}/risk", headers=auth_headers)
     assert risk_resp.status_code == 200
     risk = risk_resp.json()
@@ -235,7 +294,7 @@ async def test_portfolio_risk_analytics_and_stress_test(
     assert "var_95_param" in risk
     assert "cvar_95" in risk
 
-    # 3. Stress test endpoint
+    # 4. Stress test endpoint
     stress_resp = await client.post(
         f"/api/v1/portfolios/{port_id}/stress-test", headers=auth_headers
     )
@@ -252,7 +311,7 @@ async def test_portfolio_risk_analytics_and_stress_test(
 
 @pytest.mark.asyncio
 async def test_portfolio_optimization(
-    client: httpx.AsyncClient, auth_headers: dict[str, str]
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
 ) -> None:
     # 1. Create portfolio
     port = (
@@ -276,6 +335,17 @@ async def test_portfolio_optimization(
                 "price": price,
             },
         )
+
+    # Verify explicit 422 DataUnavailable before price seeding
+    unavail_opt = await client.post(
+        f"/api/v1/portfolios/{port_id}/optimize?objective=max_sharpe",
+        headers=auth_headers,
+    )
+    assert unavail_opt.status_code == 422
+    assert unavail_opt.json()["error"]["code"] == "data_unavailable"
+
+    # Seed real prices
+    await _seed_portfolio_prices(db, ["AAPL", "MSFT", "GOOGL"])
 
     # 2. Max Sharpe Optimization
     opt_resp = await client.post(

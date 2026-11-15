@@ -232,3 +232,17 @@ carries a code, severity, message, instrument and optional day so the UI and API
 primary source. The platform never fabricates a correction or hides an anomaly. A future
 provider-specific repair workflow must be explicit and auditable rather than silently normalising
 vendor errors.
+
+## ADR-015 — Elimination of synthetic data fallbacks and strict DataUnavailable reporting
+
+**Status:** Accepted
+
+**Context:** Several analytics paths (e.g. portfolio risk, mean-variance optimizer, backtest engine, valuation monte carlo) previously fell back to `np.random.normal` or global seed generation (`np.random.seed(42)`) when market price series or aligned returns were missing. This violated the core mandate against fabricated or random numbers in analysis paths.
+
+**Decision:**
+1. Completely remove synthetic and random fallback generators from all analysis and backtesting routers.
+2. In `services/valuation.py`, replace global `np.random.seed` with scoped `numpy.random.default_rng(seed)`, accept `seed` as an explicit request parameter, and include it in response metadata.
+3. Return HTTP 422 with typed `DataUnavailableError` envelope (`{"error": {"code": "data_unavailable", "message": ..., "details": ...}}`) when price history or inputs are insufficient.
+4. Establish repository-wide AST/source test `test_no_random_or_fabricated_data_in_codebase` guarding against unauthorized random calls.
+
+**Consequences:** The analysis engine strictly reports missing data rather than fabricating numbers. The UI displays informative data-unavailable states with missing ticker details.

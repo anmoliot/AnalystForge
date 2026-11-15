@@ -110,8 +110,9 @@ async def sensitivity_table(body: SensitivityRequest) -> dict[str, Any]:
 async def monte_carlo(
     body: DCFRequest,
     iterations: Annotated[int, Query(ge=100, le=5000)] = 1000,
+    seed: Annotated[int, Query()] = 42,
 ) -> dict[str, Any]:
-    return compute_monte_carlo(body.model_dump(), iterations=iterations)
+    return compute_monte_carlo(body.model_dump(), iterations=iterations, seed=seed)
 
 
 @router.post("/dcf/export/excel", summary="Export DCF model as an Excel workbook with live formulas")

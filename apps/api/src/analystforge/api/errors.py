@@ -60,7 +60,7 @@ class ProviderUnavailableError(AppError):
 
 
 class DataUnavailableError(AppError):
-    status_code = 424
+    status_code = 422
     code = "data_unavailable"
 
 

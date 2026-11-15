@@ -118,10 +118,10 @@ def compute_sensitivity_grid(
 
 
 def compute_monte_carlo(
-    params: dict[str, Any], iterations: int = 1000
+    params: dict[str, Any], iterations: int = 1000, seed: int = 42
 ) -> dict[str, Any]:
-    """Run Monte Carlo simulation on growth and margin drivers."""
-    np.random.seed(42)  # Deterministic seed for reproducible tests
+    """Run Monte Carlo simulation on growth and margin drivers using an explicit RNG."""
+    rng = np.random.default_rng(seed)
     base_growth = [float(g) for g in params["revenue_growth"]]
     base_margin = [float(m) for m in params["ebit_margin"]]
     if len(base_margin) == 1:
@@ -130,8 +130,8 @@ def compute_monte_carlo(
     values: list[float] = []
     for _ in range(iterations):
         # Sample normal variation around growth (+/- 2% vol) and margin (+/- 1.5% vol)
-        sim_growth = [g + np.random.normal(0, 0.015) for g in base_growth]
-        sim_margin = [max(0.01, m + np.random.normal(0, 0.01)) for m in base_margin]
+        sim_growth = [g + float(rng.normal(0, 0.015)) for g in base_growth]
+        sim_margin = [max(0.01, m + float(rng.normal(0, 0.01))) for m in base_margin]
 
         p = dict(params)
         p["revenue_growth"] = sim_growth
@@ -143,7 +143,7 @@ def compute_monte_carlo(
             continue
 
     if not values:
-        return {"mean": 0.0, "p10": 0.0, "p50": 0.0, "p90": 0.0, "std": 0.0}
+        return {"mean": 0.0, "p10": 0.0, "p50": 0.0, "p90": 0.0, "std": 0.0, "seed": seed}
 
     arr = np.array(values)
     return {
@@ -156,6 +156,7 @@ def compute_monte_carlo(
         "p90": float(np.percentile(arr, 90)),
         "min": float(np.min(arr)),
         "max": float(np.max(arr)),
+        "seed": seed,
     }
 
 

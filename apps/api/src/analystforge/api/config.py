@@ -71,10 +71,15 @@ class Settings(BaseSettings):
     provider_cooldown_seconds: float = Field(default=300.0, ge=0, le=3600)
     price_history_years: int = Field(default=10, ge=1, le=30)
 
-    llm_provider: Literal["none", "anthropic", "openai"] = "anthropic"
-    anthropic_api_key: SecretStr | None = None
-    llm_model: str = "claude-sonnet-4-6"
+    llm_provider: Literal["none", "openai-compatible", "anthropic", "openai"] = "openai-compatible"
+    llm_base_url: str = "https://api.groq.com/openai/v1"
+    llm_api_key: SecretStr | None = None
+    llm_model: str = "llama-3.3-70b-versatile"
+    llm_fallback_model: str = "llama-3.1-8b-instant"
+    llm_max_input_tokens: int = Field(default=5000, ge=100, le=128000)
+    llm_requests_per_minute: int = Field(default=20, ge=1, le=1000)
     llm_max_tokens: int = Field(default=1200, ge=128, le=8192)
+    anthropic_api_key: SecretStr | None = None
     finbert_enabled: bool = False
     finbert_model: str = "ProsusAI/finbert"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -191,6 +196,9 @@ class Settings(BaseSettings):
             "fmp": self.fmp_api_key,
             "newsapi": self.newsapi_api_key,
             "anthropic": self.anthropic_api_key,
+            "openai-compatible": self.llm_api_key,
+            "groq": self.llm_api_key,
+            "llm": self.llm_api_key,
         }
         value = keys.get(name)
         return value.get_secret_value() if value else None

@@ -16,7 +16,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import selectinload
 
 from analystforge.api.deps import CurrentUser, SessionDep
-from analystforge.api.errors import NotFoundError, ValidationFailedError
+from analystforge.api.errors import DataUnavailableError, NotFoundError, ValidationFailedError
 from analystforge.api.models.backtest import BacktestRun, BacktestTrade
 from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.quant.returns import cagr
@@ -224,20 +224,20 @@ async def run_backtest(
         )
         bar_rows = (await session.execute(stmt)).fetchall()
 
-    if len(bar_rows) >= 30:
-        df = pd.DataFrame([
-            {"date": r[0].date(), "close": float(r[1])}
-            for r in bar_rows
-        ])
-    else:
-        # Generate deterministic synthetic pricing for backtest test/demo
-        np.random.seed(hash(ticker) % 2**32)
-        days = 120
-        start = payload.start_date or (date.today() - timedelta(days=days * 2))
-        date_range = [start + timedelta(days=i) for i in range(days)]
-        returns = np.random.normal(0.0008, 0.015, days)
-        price_curve = 150.0 * np.cumprod(1.0 + returns)
-        df = pd.DataFrame({"date": date_range, "close": price_curve})
+    if len(bar_rows) < 30:
+        raise DataUnavailableError(
+            f"Insufficient price history for ticker '{ticker}'. Minimum 30 daily price bars required.",
+            details={
+                "ticker": ticker,
+                "available_bars": len(bar_rows),
+                "required_bars": 30,
+            },
+        )
+
+    df = pd.DataFrame([
+        {"date": r[0].date(), "close": float(r[1])}
+        for r in bar_rows
+    ])
 
     start_d = df["date"].iloc[0]
     end_d = df["date"].iloc[-1]

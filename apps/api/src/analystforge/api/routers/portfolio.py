@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
 from analystforge.api.deps import CurrentUser, SessionDep
-from analystforge.api.errors import NotFoundError, ValidationFailedError
+from analystforge.api.errors import DataUnavailableError, NotFoundError, ValidationFailedError
 from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.api.models.portfolio import Portfolio, PortfolioTransaction
 from analystforge.api.services.portfolio import (
@@ -328,15 +328,19 @@ async def get_portfolio_risk(
             prices = [float(r[1]) for r in bar_rows]
             daily_prices[ticker] = pd.Series(prices, index=pd.to_datetime(dates))
 
-    if not daily_prices:
-        # Fallback to conservative synthetic baseline if prices not loaded
-        synth_ret = pd.Series(np.random.normal(0.0005, 0.012, 100))
-        return compute_portfolio_analytics(synth_ret)
+    if not daily_prices or len(pd.DataFrame(daily_prices).dropna()) < 5:
+        missing_tickers = [t for t in tickers if t not in daily_prices or len(daily_prices[t]) < 5]
+        raise DataUnavailableError(
+            "Insufficient price history for portfolio holdings; fabricated numbers are disallowed",
+            details={
+                "tickers": tickers,
+                "missing_tickers": missing_tickers,
+                "available_bars": {t: len(s) for t, s in daily_prices.items()},
+                "required_bars": 5,
+            },
+        )
 
     df_prices = pd.DataFrame(daily_prices).dropna()
-    if len(df_prices) < 5:
-        synth_ret = pd.Series(np.random.normal(0.0005, 0.012, 100))
-        return compute_portfolio_analytics(synth_ret)
 
     returns_df = df_prices.pct_change().dropna()
     weights = [float(h.total_cost) for h in holdings if h.ticker in returns_df.columns]
@@ -364,13 +368,9 @@ async def optimize_portfolio_endpoint(
     tickers = [h.ticker for h in holdings]
 
     if len(tickers) < 2:
-        return {
-            "weights": {t: 1.0 / len(tickers) for t in tickers} if tickers else {},
-            "expected_return": 0.08,
-            "expected_volatility": 0.15,
-            "sharpe": 0.53,
-            "frontier": [],
-        }
+        raise ValidationFailedError(
+            "Portfolio must contain at least 2 distinct asset holdings for portfolio optimization; fabricated numbers are disallowed."
+        )
 
     # Fetch price history to compute covariance matrix
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
@@ -391,21 +391,22 @@ async def optimize_portfolio_endpoint(
 
     # Align series
     min_len = min((len(v) for v in daily_dict.values()), default=0)
-    if min_len >= 10:
-        clean_dict = {t: v[-min_len:] for t, v in daily_dict.items()}
-        prices_df = pd.DataFrame(clean_dict)
-        ret_df = prices_df.pct_change().dropna()
-        return optimize_weights(ret_df, objective=objective)
+    if min_len < 10 or len(daily_dict) < len(tickers):
+        missing_or_sparse = [t for t in tickers if len(daily_dict.get(t, [])) < 10]
+        raise DataUnavailableError(
+            "Insufficient aligned price history for portfolio optimization; fabricated numbers are disallowed",
+            details={
+                "tickers": tickers,
+                "sparse_tickers": missing_or_sparse,
+                "available_bars": {t: len(v) for t, v in daily_dict.items()},
+                "required_bars": 10,
+            },
+        )
 
-    # Deterministic fallback when price bars are sparse in test environments
-    np.random.seed(42)
-    fake_dates = pd.date_range(end=date.today(), periods=60, freq="B")
-    fake_ret = pd.DataFrame(
-        np.random.normal(0.0006, 0.014, (60, len(tickers))),
-        columns=tickers,
-        index=fake_dates,
-    )
-    return optimize_weights(fake_ret, objective=objective)
+    clean_dict = {t: v[-min_len:] for t, v in daily_dict.items()}
+    prices_df = pd.DataFrame(clean_dict)
+    ret_df = prices_df.pct_change().dropna()
+    return optimize_weights(ret_df, objective=objective)
 
 
 @router.post("/{portfolio_id}/stress-test", summary="Historical macro stress shock scenarios")

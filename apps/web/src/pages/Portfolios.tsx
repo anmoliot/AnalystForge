@@ -78,7 +78,7 @@ export default function Portfolios() {
     enabled: Boolean(activePortId) && activeTab === "transactions",
   });
 
-  const { data: riskMetrics } = useQuery({
+  const { data: riskMetrics, error: riskError } = useQuery({
     queryKey: ["portfolio-risk", activePortId],
     queryFn: () => (activePortId ? api.get<PortfolioRisk>(`/api/v1/portfolios/${activePortId}/risk`) : null),
     enabled: Boolean(activePortId),
@@ -93,7 +93,7 @@ export default function Portfolios() {
     enabled: Boolean(activePortId) && activeTab === "risk",
   });
 
-  const { data: optResult, isFetching: optimizing } = useQuery({
+  const { data: optResult, isFetching: optimizing, error: optError } = useQuery({
     queryKey: ["portfolio-opt", activePortId, optimizeObj],
     queryFn: () =>
       activePortId
@@ -557,6 +557,18 @@ export default function Portfolios() {
                 </div>
               </Panel>
 
+              {riskError && (
+                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-start gap-2" data-testid="risk-data-unavailable">
+                  <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-200">Risk Analytics Unavailable</p>
+                    <p className="mt-0.5 text-amber-300/80">
+                      {(riskError as any)?.response?.data?.error?.message || (riskError as any)?.message || "Insufficient price history for portfolio holdings."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Parametric vs Historical Risk Breakdown */}
               <div className="grid gap-4 md:grid-cols-2">
                 <Panel className="p-4 space-y-2">
@@ -644,6 +656,16 @@ export default function Portfolios() {
 
                 {optimizing ? (
                   <div className="skeleton h-48 w-full" />
+                ) : optError ? (
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-start gap-2" data-testid="optimizer-data-unavailable">
+                    <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-200">Data Unavailable for Optimization</p>
+                      <p className="mt-0.5 text-amber-300/80">
+                        {(optError as any)?.response?.data?.error?.message || (optError as any)?.message || "Insufficient aligned price history for portfolio holdings."}
+                      </p>
+                    </div>
+                  </div>
                 ) : optResult ? (
                   <div className="grid gap-4 lg:grid-cols-3">
                     <div className="space-y-3 lg:col-span-2">
