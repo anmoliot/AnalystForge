@@ -16,6 +16,7 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const Alerts = lazy(() => import("@/pages/Alerts"));
 const Admin = lazy(() => import("@/pages/Admin"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Login = lazy(() => import("@/pages/Login"));
 
 function PageFallback() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="alerts" element={<Alerts />} />
           <Route path="admin" element={<Admin />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="login" element={<Login />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

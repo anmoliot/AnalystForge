@@ -9,6 +9,7 @@ import { StatusDot } from "@/components/ui/StatusDot";
 import { findNavItem, navSections } from "@/config/nav";
 import { useMeta, useReadiness } from "@/hooks/useMeta";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/stores/auth";
 import { useCommandPalette } from "@/stores/commandPalette";
 
 function UtcClock() {
@@ -33,6 +34,7 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const meta = useMeta();
   const readiness = useReadiness();
+  const auth = useAuth();
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -212,12 +214,28 @@ export function AppShell() {
             </button>
 
             <ThemeToggle />
-            <div
-              className="flex size-6 items-center justify-center rounded-full border border-line bg-elevated font-mono text-2xs font-semibold text-ink"
-              title="Signed out"
-            >
-              AF
-            </div>
+            {auth.isAuthenticated && auth.user ? (
+              <div className="flex items-center gap-1.5">
+                <span className="hidden text-2xs font-medium text-ink sm:inline-block">
+                  {auth.user.full_name}
+                </span>
+                <Badge tone="accent">{auth.user.role}</Badge>
+                <button
+                  type="button"
+                  onClick={() => auth.logout()}
+                  className="rounded border border-line bg-elevated px-2 py-0.5 text-2xs text-muted hover:text-ink"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <NavLink
+                to="/login"
+                className="rounded border border-accent/40 bg-accent/10 px-2 py-1 text-xs font-medium text-accent hover:bg-accent/20"
+              >
+                Sign In
+              </NavLink>
+            )}
           </header>
 
           <main id="main-content" className="min-h-0 flex-1 overflow-y-auto">

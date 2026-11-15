@@ -34,6 +34,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  if (typeof localStorage !== "undefined") {
+    const token = localStorage.getItem("af-token");
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
   const response = await fetch(path, {
     ...init,
     headers,
@@ -293,4 +299,84 @@ export interface StatementData {
   balance: Array<{ fiscal_year: number; period: string; values: Record<string, number> }>;
   cashflow: Array<{ fiscal_year: number; period: string; values: Record<string, number> }>;
 }
+
+export interface PortfolioSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  base_currency: string;
+  benchmark_ticker: string;
+  cost_basis_method: string;
+  created_at: string;
+}
+
+export interface HoldingDetail {
+  ticker: string;
+  shares: number;
+  cost_basis: number;
+  total_cost: number;
+  current_price?: number | null;
+  market_value?: number | null;
+  unrealized_pnl?: number | null;
+  unrealized_pnl_pct?: number | null;
+  weight?: number | null;
+}
+
+export interface PortfolioDetail extends PortfolioSummary {
+  holdings: HoldingDetail[];
+  total_value?: number;
+  total_cost?: number;
+  unrealized_pnl?: number;
+}
+
+export interface PortfolioRisk {
+  volatility: number;
+  sharpe: number | null;
+  sortino: number | null;
+  max_drawdown: number;
+  var_95_hist: number;
+  var_95_param: number;
+  cvar_95: number;
+}
+
+export interface StressScenarioResult {
+  name: string;
+  start: string;
+  end: string;
+  description: string;
+  shock_pct: number;
+  projected_loss: number;
+  post_shock_value: number;
+  status: string;
+}
+
+export interface OptimizationResult {
+  objective: string;
+  tickers: string[];
+  weights: Record<string, number>;
+  expected_return: number | null;
+  expected_volatility: number | null;
+  sharpe: number | null;
+  frontier: Array<{
+    target_return: number;
+    volatility: number;
+    expected_return: number | null;
+    sharpe: number | null;
+  }>;
+  risk_contributions?: Record<string, number>;
+}
+
+export interface PortfolioTx {
+  id: string;
+  portfolio_id: string;
+  ticker: string;
+  transaction_type: string;
+  trade_date: string;
+  quantity: number;
+  price: number;
+  currency: string;
+  commission: number;
+  notes?: string | null;
+}
+
 

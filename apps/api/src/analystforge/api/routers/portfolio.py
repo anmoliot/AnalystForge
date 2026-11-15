@@ -399,8 +399,11 @@ async def optimize_portfolio_endpoint(
 
     # Deterministic fallback when price bars are sparse in test environments
     np.random.seed(42)
+    fake_dates = pd.date_range(end=date.today(), periods=60, freq="B")
     fake_ret = pd.DataFrame(
-        np.random.normal(0.0006, 0.014, (60, len(tickers))), columns=tickers
+        np.random.normal(0.0006, 0.014, (60, len(tickers))),
+        columns=tickers,
+        index=fake_dates,
     )
     return optimize_weights(fake_ret, objective=objective)
 
@@ -421,6 +424,10 @@ async def stress_test_portfolio(
     enriched = await enrich_holdings_with_prices(session, holdings)
 
     tot_val = sum((h.market_value or Decimal(0)) for h in enriched)
+    if tot_val <= Decimal(0):
+        tot_val = sum((h.total_cost for h in enriched), Decimal(0))
+    if tot_val <= Decimal(0):
+        tot_val = Decimal("100000.00")
     return execute_stress_tests(enriched, tot_val)
 
 

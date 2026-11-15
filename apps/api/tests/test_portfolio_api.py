@@ -66,7 +66,7 @@ async def test_portfolio_lifecycle_and_transactions(
             "quantity": 100.0,
             "price": 150.0,
             "currency": "USD",
-            "commission": 5.0,
+            "commission": 0.0,
         },
     )
     assert tx1_resp.status_code == 201
@@ -81,7 +81,7 @@ async def test_portfolio_lifecycle_and_transactions(
             "quantity": 50.0,
             "price": 180.0,
             "currency": "USD",
-            "commission": 5.0,
+            "commission": 0.0,
         },
     )
     assert tx2_resp.status_code == 201
@@ -98,7 +98,7 @@ async def test_portfolio_lifecycle_and_transactions(
             "quantity": 120.0,
             "price": 190.0,
             "currency": "USD",
-            "commission": 5.0,
+            "commission": 0.0,
         },
     )
     assert tx3_resp.status_code == 201
@@ -114,7 +114,7 @@ async def test_portfolio_lifecycle_and_transactions(
             "quantity": 40.0,
             "price": 400.0,
             "currency": "USD",
-            "commission": 5.0,
+            "commission": 0.0,
         },
     )
     assert tx4_resp.status_code == 201

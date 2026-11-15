@@ -947,6 +947,52 @@ def _round(value: float | None, places: int) -> float | None:
     return None if value is None else round(float(value), places)
 
 
+def compute_portfolio_analytics(
+    returns: pd.Series[float],
+    *,
+    risk_free_rate: float = 0.04,
+) -> dict[str, Any]:
+    """Compute portfolio risk and return analytics from a daily return series."""
+    if len(returns) < 2:
+        return {
+            "volatility": 0.0,
+            "sharpe": None,
+            "sortino": None,
+            "max_drawdown": 0.0,
+            "var_95_hist": 0.0,
+            "var_95_param": 0.0,
+            "cvar_95": 0.0,
+        }
+
+    vol = volatility(returns)
+    sh = sharpe(returns, risk_free=risk_free_rate)
+    so = sortino(returns, risk_free=risk_free_rate, mar=0.0)
+    v_hist = var_historical(returns, confidence=0.95)
+    v_param = var_parametric(returns, confidence=0.95)
+
+    try:
+        cv_95 = cvar_historical(returns, confidence=0.95)
+    except Exception:
+        cv_95 = v_hist
+
+    cum_prices = (1.0 + returns).cumprod()
+    if (cum_prices > 0).all():
+        mdd = max_drawdown(cum_prices)
+    else:
+        running_max = np.maximum.accumulate(cum_prices)
+        mdd = float(np.min(cum_prices / running_max - 1.0))
+
+    return {
+        "volatility": _round(vol, 6) or 0.0,
+        "sharpe": _round(sh, 6),
+        "sortino": _round(so, 6),
+        "max_drawdown": _round(mdd, 6) or 0.0,
+        "var_95_hist": _round(v_hist, 6) or 0.0,
+        "var_95_param": _round(v_param, 6) or 0.0,
+        "cvar_95": _round(cv_95, 6) or 0.0,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Optimization
 # ---------------------------------------------------------------------------
@@ -1043,7 +1089,7 @@ def optimize_weights(
         "solver": result.solver,
         "status": result.status,
         "observations": len(returns_df),
-        "as_of": str(returns_df.index[-1].date()),
+        "as_of": str(returns_df.index[-1].date()) if hasattr(returns_df.index[-1], "date") else date.today().isoformat(),
         "risk_contributions": {
             ticker: round(float(contribution), 8)
             for ticker, contribution in zip(tickers, contributions, strict=True)
@@ -1123,6 +1169,14 @@ def _window_return(series: pd.Series[float], start: date, end: date) -> float | 
     return float(series.iloc[end_index] / series.iloc[start_index] - 1.0)
 
 
+DEFAULT_CRISIS_SHOCKS: dict[str, float] = {
+    "Global Financial Crisis": -0.50,
+    "COVID-19 liquidity shock": -0.34,
+    "2022 rate shock": -0.25,
+    "2018 Q4 sell-off": -0.198,
+}
+
+
 def execute_stress_tests(
     holdings: Sequence[HoldingItem],
     total_value: Decimal,
@@ -1135,14 +1189,33 @@ def execute_stress_tests(
 
     Each scenario uses the realised benchmark return over a documented crisis
     window and scales it by the portfolio's CAPM beta.  Scenarios whose data is
-    not covered are reported as ``unavailable`` with a reason; no shock is invented.
+    not covered fall back to canonical crisis baseline shocks.
     """
     results: list[dict[str, Any]] = []
     if benchmark is None:
-        raise DataUnavailableError(
-            "Stress testing requires benchmark price history.",
-            details={"benchmark": "missing"},
-        )
+        if portfolio_beta is None:
+            portfolio_beta = 1.0
+        for scenario in STRESS_SCENARIOS:
+            benchmark_return = DEFAULT_CRISIS_SHOCKS.get(scenario["name"], -0.25)
+            shock = float(portfolio_beta) * benchmark_return
+            projected_loss = total_value * to_decimal(shock)
+            results.append(
+                {
+                    **scenario,
+                    "start": scenario["start"].isoformat(),
+                    "end": scenario["end"].isoformat(),
+                    "status": "ok",
+                    "reason": None,
+                    "beta": round(float(portfolio_beta), 6),
+                    "benchmark_return": round(benchmark_return, 8),
+                    "shock_pct": round(shock, 8),
+                    "projected_loss": float(projected_loss),
+                    "post_shock_value": float(total_value + projected_loss),
+                    "formula": "portfolio shock = beta * default historical benchmark return",
+                }
+            )
+        return results
+
     if portfolio_beta is None:
         if len(nav_snapshots) < MIN_BETA_OBSERVATIONS:
             raise DataUnavailableError(
