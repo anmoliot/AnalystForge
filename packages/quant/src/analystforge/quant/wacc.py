@@ -35,6 +35,14 @@ def _non_negative(value: Decimal | int | str | float, name: str) -> Decimal:
     return amount
 
 
+def blume_adjusted_beta(raw_beta: Decimal | int | str | float) -> Decimal:
+    """Blume mean-reverting adjusted beta: ``(2/3) * raw_beta + (1/3) * 1.0``."""
+    beta = to_decimal(raw_beta)
+    two_thirds = Decimal("2") / Decimal("3")
+    one_third = Decimal("1") / Decimal("3")
+    return beta * two_thirds + one_third
+
+
 def capm_cost_of_equity(
     risk_free_rate: Decimal | int | str | float,
     beta: Decimal | int | str | float,

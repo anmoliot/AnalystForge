@@ -166,6 +166,14 @@ export const queries = {
   runDcf: (payload: DCFPayload) => api.post<DCFOutput>("/api/v1/valuation/dcf", payload),
   dcfSensitivity: (payload: DCFPayload) => api.post<SensitivityOutput>("/api/v1/valuation/dcf/sensitivity", payload),
   dcfMonteCarlo: (payload: DCFPayload, iterations = 500) => api.post<MonteCarloOutput>(`/api/v1/valuation/dcf/montecarlo?iterations=${iterations}`, payload),
+  runFcfe: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/fcfe", payload),
+  runDdm: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/ddm", payload),
+  runResidualIncome: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/residual-income", payload),
+  runComps: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/comps", payload),
+  runSotp: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/sotp", payload),
+  runPrecedents: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/precedents", payload),
+  deriveWacc: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/wacc-builder", payload),
+  runFootballField: (payload: Record<string, unknown>) => api.post<Record<string, unknown>>("/api/v1/valuation/football-field", payload),
 };
 
 export interface DCFPayload {

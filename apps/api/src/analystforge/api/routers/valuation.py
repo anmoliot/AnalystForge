@@ -1,4 +1,4 @@
-"""Valuation workbench endpoints: DCF engine, sensitivity, Monte Carlo, Excel export, and model versioning."""
+"""Valuation workbench endpoints: DCF, FCFE, DDM, Residual Income, Comps, SOTP, Precedents, WACC builder, and Football Field."""
 
 from __future__ import annotations
 
@@ -15,7 +15,15 @@ from analystforge.api.models.valuation import ValuationModel, ValuationVersion
 from analystforge.api.services.valuation import (
     compute_monte_carlo,
     compute_sensitivity_grid,
+    execute_comps,
     execute_dcf,
+    execute_ddm,
+    execute_fcfe,
+    execute_football_field,
+    execute_precedents,
+    execute_residual_income,
+    execute_sotp,
+    execute_wacc_builder,
     generate_dcf_excel_workbook,
 )
 
@@ -48,6 +56,116 @@ class DCFRequest(BaseModel):
 class SensitivityRequest(DCFRequest):
     wacc_steps: list[float] | None = None
     g_steps: list[float] | None = None
+
+
+class FCFERequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    base_net_income: float = Field(gt=0)
+    net_income_growth: list[float] = Field(min_length=1)
+    cost_of_equity: float = Field(gt=0, le=1)
+    terminal_growth: float = Field(ge=-0.1, le=0.1, default=0.025)
+    shares_outstanding: float = Field(gt=0)
+    depreciation_pct_ni: float = Field(ge=0, default=0.10)
+    capex_pct_ni: float = Field(ge=0, default=0.15)
+    nwc_pct_ni: float = Field(default=0.05)
+    net_borrowing_pct_ni: float = Field(default=0.05)
+    terminal_method: str = "gordon_growth"
+    exit_multiple: float | None = None
+    mid_year_convention: bool = False
+
+
+class DDMRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    model_type: str = "gordon"  # "gordon" or "multi_stage"
+    cost_of_equity: float = Field(gt=0, le=1)
+    # Gordon parameters
+    dividend_t0: float | None = Field(default=None, gt=0)
+    growth_rate: float | None = Field(default=None, ge=-0.1, le=0.1)
+    # Multi-stage parameters
+    base_dividend: float | None = Field(default=None, gt=0)
+    stage1_growth: list[float] | None = None
+    terminal_growth: float | None = Field(default=None, ge=-0.1, le=0.1)
+
+
+class ResidualIncomeRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    base_book_value: float = Field(gt=0)
+    forecast_net_income: list[float] = Field(min_length=1)
+    cost_of_equity: float = Field(gt=0, le=1)
+    shares_outstanding: float = Field(gt=0)
+    dividend_payout_ratio: float = Field(ge=0, le=1, default=0.0)
+    terminal_method: str = "zero_growth"
+    terminal_growth: float = Field(default=0.0)
+    persistence_factor: float = Field(ge=0, le=1, default=1.0)
+
+
+class CompsRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    peer_multiples: list[float] = Field(min_length=1)
+    target_metric: float = Field(gt=0)
+    shares_outstanding: float = Field(gt=0)
+    net_debt: float = Field(default=0.0)
+    is_equity_multiple: bool = False  # True for P/E or P/B, False for EV/EBITDA
+
+
+class SOTPSegmentInput(BaseModel):
+    name: str
+    metric_name: str
+    metric_value: float = Field(gt=0)
+    multiple: float = Field(gt=0)
+    ownership_pct: float = Field(gt=0, le=1, default=1.0)
+
+
+class SOTPRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    segments: list[SOTPSegmentInput] = Field(min_length=1)
+    shares_outstanding: float = Field(gt=0)
+    net_debt: float = Field(default=0.0)
+    non_controlling_interest: float = Field(default=0.0)
+    investments_associates: float = Field(default=0.0)
+    corporate_overhead_pv: float = Field(default=0.0)
+
+
+class PrecedentDealInput(BaseModel):
+    target: str
+    announced_date: str = ""
+    deal_value: float = Field(gt=0)
+    target_metric: float = Field(gt=0)
+
+
+class PrecedentsRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    deals: list[PrecedentDealInput] = Field(min_length=1)
+    target_metric: float = Field(gt=0)
+    shares_outstanding: float = Field(gt=0)
+    net_debt: float = Field(default=0.0)
+
+
+class WACCBuilderRequest(BaseModel):
+    raw_beta: float = Field(default=1.0)
+    apply_blume: bool = True
+    risk_free_rate: float | None = None  # None queries live FRED DGS10
+    equity_risk_premium: float = Field(default=0.055)
+    pre_tax_cost_of_debt: float = Field(default=0.055)
+    tax_rate: float = Field(ge=0, le=1, default=0.21)
+    market_value_equity: float = Field(gt=0, default=1000000.0)
+    market_value_debt: float = Field(ge=0, default=250000.0)
+
+
+class ValuationRangeInput(BaseModel):
+    method_id: str
+    label: str
+    category: str = "Intrinsic"
+    low: float = Field(gt=0)
+    base: float = Field(gt=0)
+    high: float = Field(gt=0)
+    notes: str | None = None
+
+
+class FootballFieldRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=32)
+    current_share_price: float | None = None
+    ranges: list[ValuationRangeInput] = Field(min_length=1)
 
 
 class SaveModelRequest(BaseModel):
@@ -90,11 +208,11 @@ class ModelSummaryResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DCF Calculation Endpoints
+# Calculation Endpoints
 # ---------------------------------------------------------------------------
 
 
-@router.post("/dcf", summary="Calculate DCF valuation and projected cash flows")
+@router.post("/dcf", summary="Calculate DCF (FCFF) valuation and projected cash flows")
 async def calculate_dcf(body: DCFRequest) -> dict[str, Any]:
     return execute_dcf(body.model_dump())
 
@@ -127,6 +245,46 @@ async def export_excel(body: DCFRequest) -> Response:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/fcfe", summary="Calculate Free Cash Flow to Equity (FCFE) model")
+async def calculate_fcfe(body: FCFERequest) -> dict[str, Any]:
+    return execute_fcfe(body.model_dump())
+
+
+@router.post("/ddm", summary="Calculate Dividend Discount Model (single-stage or multi-stage)")
+async def calculate_ddm(body: DDMRequest) -> dict[str, Any]:
+    return execute_ddm(body.model_dump())
+
+
+@router.post("/residual-income", summary="Calculate Residual Income (Edwards-Bell-Ohlson) valuation")
+async def calculate_residual_income(body: ResidualIncomeRequest) -> dict[str, Any]:
+    return execute_residual_income(body.model_dump())
+
+
+@router.post("/comps", summary="Calculate Comparable Companies multiple distribution and valuation ranges")
+async def calculate_comps(body: CompsRequest) -> dict[str, Any]:
+    return execute_comps(body.model_dump())
+
+
+@router.post("/sotp", summary="Calculate Sum of the Parts (SOTP) conglomerate valuation")
+async def calculate_sotp(body: SOTPRequest) -> dict[str, Any]:
+    return execute_sotp(body.model_dump())
+
+
+@router.post("/precedents", summary="Calculate Precedent Transactions M&A multiple valuation ranges")
+async def calculate_precedents(body: PrecedentsRequest) -> dict[str, Any]:
+    return execute_precedents(body.model_dump())
+
+
+@router.post("/wacc-builder", summary="Derive WACC with CAPM, Blume adjustment, and FRED risk-free rate")
+async def derive_wacc(body: WACCBuilderRequest, session: SessionDep) -> dict[str, Any]:
+    return await execute_wacc_builder(session, body.model_dump())
+
+
+@router.post("/football-field", summary="Consolidate multiple valuation ranges into a Football Field summary")
+async def calculate_football_field(body: FootballFieldRequest) -> dict[str, Any]:
+    return execute_football_field(body.model_dump())
 
 
 # ---------------------------------------------------------------------------
