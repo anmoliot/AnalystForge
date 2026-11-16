@@ -140,5 +140,49 @@ class AnalystForgeClient:
     def list_reports(self) -> list[dict[str, Any]]:
         return self.request("GET", "/api/v1/reports")
 
-    def get_report(self, report_id: str) -> dict[str, Any]:
-        return self.request("GET", f"/api/v1/reports/{report_id}")
+    def download_report(self, report_id: str, format: str | None = None) -> bytes:
+        params: dict[str, Any] = {}
+        if format:
+            params["format"] = format
+        response = self._client.get(f"/api/v1/reports/{report_id}/download", params=params)
+        if response.status_code >= 400:
+            try:
+                err = response.json().get("error", {})
+            except ValueError:
+                err = {}
+            raise AnalystForgeError(
+                response.status_code,
+                err.get("code", "http_error"),
+                err.get("message", response.text[:500]),
+                err.get("request_id"),
+            )
+        return response.content
+
+    def email_report(self, report_id: str, recipient_email: str) -> dict[str, Any]:
+        return self.request(
+            "POST",
+            f"/api/v1/reports/{report_id}/email",
+            json={"recipient_email": recipient_email},
+        )
+
+    # Valuation & Portfolio
+    def get_valuation(self, ticker: str, wacc: float = 0.09, terminal_growth: float = 0.025) -> dict[str, Any]:
+        return self.request(
+            "POST",
+            "/api/v1/valuation/dcf",
+            json={"ticker": ticker, "wacc": wacc, "terminal_growth_rate": terminal_growth},
+        )
+
+    def get_portfolio(self, portfolio_id: str) -> dict[str, Any]:
+        return self.request("GET", f"/api/v1/portfolios/{portfolio_id}")
+
+    # News & Filings
+    def get_filings(self, ticker: str) -> list[dict[str, Any]]:
+        return self.request("GET", f"/api/v1/filings", params={"ticker": ticker})
+
+    def get_news(self, ticker: str) -> list[dict[str, Any]]:
+        return self.request("GET", f"/api/v1/news", params={"ticker": ticker})
+
+    def integrations_meta(self) -> dict[str, Any]:
+        return self.request("GET", "/api/v1/meta/integrations")
+

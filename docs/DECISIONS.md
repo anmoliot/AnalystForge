@@ -366,3 +366,21 @@ vendor errors.
    - 50-question evaluation dataset (`tests/eval_dataset.py`) covering 30 supported institutional questions and 20 speculative/hallucination traps. Tested in `apps/api/tests/test_research_wp6.py` achieving 100% citation grounding and 100% refusal precision. Full benchmark documented in `docs/AI_EVAL.md`.
 
 **Consequences:** Eliminates hallucinations and provides institutional-grade research assistance, verifiable citations, and quantitative filings/news analytics.
+
+---
+
+## ADR-021: Multi-Format Reporting Engine (PDF, PPTX, Live-Formula Excel, Email Delivery, Python SDK)
+
+**Status:** Accepted (Work Package 7)  
+**Context:** Institutional analysts require tear sheets and research reports exported in presentation formats (widescreen PowerPoint `pptx`), publication quality PDFs (ReportLab), and interactive financial models with live spreadsheet formulas (Excel `xlsx` via `xlsxwriter`), alongside structured formats (Markdown, CSV, JSON). Reports must be dispatchable over SMTP email with attachments, unsupported formats strictly rejected with HTTP 422, and the Python SDK (`analystforge-py`) expanded with full reporting and analytics methods.
+
+**Decisions:**
+1. **ReportLab PDF Engine:** Clean, branded styling with dark slate headers, typography tables, and attestation footers (`generate_pdf_report`).
+2. **PowerPoint 16:9 Presentation Deck:** Native `python-pptx` generating cover slides and financial benchmark breakdown tables (`generate_pptx_report`).
+3. **Live Formula Excel Export:** Implemented dynamic formulas (`=AVERAGE(...)`, `=SUM(...)`, `=B6-B7`) via `xlsxwriter.write_formula`, allowing models to recalculate dynamically in Excel or LibreOffice Calc (`generate_excel_report`).
+4. **Strict Format Validation:** The API validates formats against `SUPPORTED_FORMATS` (`PDF`, `PPTX`, `EXCEL`, `XLSX`, `CSV`, `JSON`, `MARKDOWN`) and raises HTTP 422 Unprocessable Content if unsupported formats (e.g. `DOCX`, `XML`) are requested.
+5. **Report Email Delivery:** Wired `POST /api/v1/reports/{id}/email` to the alerting SMTP layer, supporting binary attachments (`MIMEApplication` / `MIMEBase`).
+6. **Python SDK Expansion:** Added `download_report`, `email_report`, `get_valuation`, `get_portfolio`, `get_filings`, `get_news`, and `integrations_meta` to `analystforge_sdk.AnalystForgeClient`.
+
+**Consequences:** Enables zero-touch institutional publishing, automated email distribution, live spreadsheet auditability, and programmatic Python workflows.
+

@@ -39,6 +39,7 @@ def _sync_send_smtp_email(
     text_content: str,
     html_content: str | None = None,
     use_tls: bool = False,
+    attachment: tuple[str, bytes, str] | None = None,
 ) -> None:
     """Synchronous SMTP email sender executed in background thread pool."""
     msg = EmailMessage()
@@ -49,6 +50,13 @@ def _sync_send_smtp_email(
 
     if html_content:
         msg.add_alternative(html_content, subtype="html")
+
+    if attachment:
+        filename, data_bytes, mime_type = attachment
+        parts = mime_type.split("/", 1)
+        maintype = parts[0] if len(parts) > 1 else "application"
+        subtype = parts[1] if len(parts) > 1 else "octet-stream"
+        msg.add_attachment(data_bytes, maintype=maintype, subtype=subtype, filename=filename)
 
     with smtplib.SMTP(host, port, timeout=10.0) as server:
         if use_tls:
@@ -64,6 +72,7 @@ async def send_alert_email(
     subject: str,
     text_content: str,
     html_content: str | None = None,
+    attachment: tuple[str, bytes, str] | None = None,
 ) -> None:
     """Deliver an email alert asynchronously via configured SMTP host/mail catcher."""
     pwd = settings.smtp_password.get_secret_value() if settings.smtp_password else None
@@ -79,6 +88,7 @@ async def send_alert_email(
         text_content=text_content,
         html_content=html_content,
         use_tls=settings.smtp_tls,
+        attachment=attachment,
     )
 
 

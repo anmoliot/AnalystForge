@@ -35,6 +35,15 @@ def test_client_reporting_and_research():
         200,
         json={"id": "r1", "status": "COMPLETED"},
     )
+    respx.get("http://mock-api/api/v1/reports/r1/download?format=PDF").respond(
+        200,
+        content=b"%PDF-1.4 test binary",
+        headers={"Content-Type": "application/pdf"},
+    )
+    respx.post("http://mock-api/api/v1/reports/r1/email").respond(
+        200,
+        json={"status": "sent", "recipient": "analyst@firm.com"},
+    )
 
     with AnalystForgeClient(base_url="http://mock-api") as client:
         res = client.query_research("What is the valuation?", ticker="AAPL")
@@ -42,6 +51,12 @@ def test_client_reporting_and_research():
 
         rep = client.generate_report(title="Apple Memo", ticker="AAPL")
         assert rep["id"] == "r1"
+
+        pdf_bytes = client.download_report("r1", format="PDF")
+        assert pdf_bytes.startswith(b"%PDF")
+
+        email_res = client.email_report("r1", recipient_email="analyst@firm.com")
+        assert email_res["status"] == "sent"
 
 
 @respx.mock
