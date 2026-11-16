@@ -13,6 +13,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   FolderOpen,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -563,7 +564,7 @@ export default function Portfolios() {
                   <div>
                     <p className="font-semibold text-amber-200">Risk Analytics Unavailable</p>
                     <p className="mt-0.5 text-amber-300/80">
-                      {(riskError as any)?.response?.data?.error?.message || (riskError as any)?.message || "Insufficient price history for portfolio holdings."}
+                      {riskError instanceof Error ? riskError.message : "Insufficient price history for portfolio holdings."}
                     </p>
                   </div>
                 </div>
@@ -662,7 +663,7 @@ export default function Portfolios() {
                     <div>
                       <p className="font-semibold text-amber-200">Data Unavailable for Optimization</p>
                       <p className="mt-0.5 text-amber-300/80">
-                        {(optError as any)?.response?.data?.error?.message || (optError as any)?.message || "Insufficient aligned price history for portfolio holdings."}
+                        {optError instanceof Error ? optError.message : "Insufficient aligned price history for portfolio holdings."}
                       </p>
                     </div>
                   </div>

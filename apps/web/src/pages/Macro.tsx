@@ -5,6 +5,7 @@ import {
   CheckCircle,
   RefreshCw,
   DollarSign,
+  Info,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -23,10 +24,12 @@ import { Panel } from "@/components/ui/Panel";
 import { api } from "@/lib/api";
 
 export interface YieldCurveResponse {
-  as_of: string;
-  spread_10y_2y: number;
+  configured: boolean;
+  message?: string | null;
+  as_of?: string | null;
+  spread_10y_2y?: number | null;
   is_inverted: boolean;
-  curve: Array<{ tenor: string; rate: number }>;
+  curve: Array<{ tenor: string; rate: number | null; as_of?: string | null }>;
 }
 
 export interface FxRateItem {
@@ -39,38 +42,33 @@ export interface FxRateItem {
 
 export interface MacroSeriesItem {
   code: string;
+  id?: string;
   title: string;
   units: string;
   frequency: string;
   provider: string;
+  latest_value?: number | null;
+  latest_date?: string | null;
+  as_of?: string | null;
+}
+
+export interface SeriesDetailResponse {
+  code: string;
+  title: string;
+  units: string;
+  frequency: string;
+  as_of?: string | null;
+  observations: Array<{ day: string; value: number }>;
 }
 
 export default function Macro() {
   const [selectedSeries, setSelectedSeries] = useState<string>("FEDFUNDS");
 
   // Yield curve query
-  const { data: yieldCurve, refetch: refetchCurve } = useQuery<YieldCurveResponse>({
+  const { data: yieldCurve, refetch: refetchCurve, isLoading: isLoadingCurve } = useQuery<YieldCurveResponse>({
     queryKey: ["macro-yield-curve"],
     queryFn: async () => {
-      try {
-        return await api.get<YieldCurveResponse>("/api/v1/macro/yield-curve");
-      } catch {
-        return {
-          as_of: new Date().toISOString().slice(0, 10),
-          spread_10y_2y: 0.22,
-          is_inverted: false,
-          curve: [
-            { tenor: "1M", rate: 5.28 },
-            { tenor: "3M", rate: 4.82 },
-            { tenor: "6M", rate: 4.65 },
-            { tenor: "1Y", rate: 4.30 },
-            { tenor: "2Y", rate: 4.15 },
-            { tenor: "5Y", rate: 4.18 },
-            { tenor: "10Y", rate: 4.37 },
-            { tenor: "30Y", rate: 4.55 },
-          ],
-        };
-      }
+      return await api.get<YieldCurveResponse>("/api/v1/macro/yield-curve");
     },
   });
 
@@ -81,13 +79,7 @@ export default function Macro() {
       try {
         return await api.get<FxRateItem[]>("/api/v1/macro/fx");
       } catch {
-        return [
-          { pair: "EUR/USD", base: "EUR", quote: "USD", rate: 1.085, date: "2026-11-15" },
-          { pair: "GBP/USD", base: "GBP", quote: "USD", rate: 1.295, date: "2026-11-15" },
-          { pair: "USD/JPY", base: "USD", quote: "JPY", rate: 154.2, date: "2026-11-15" },
-          { pair: "USD/CHF", base: "USD", quote: "CHF", rate: 0.885, date: "2026-11-15" },
-          { pair: "EUR/GBP", base: "EUR", quote: "GBP", rate: 0.838, date: "2026-11-15" },
-        ];
+        return [];
       }
     },
   });
@@ -99,48 +91,33 @@ export default function Macro() {
       try {
         return await api.get<MacroSeriesItem[]>("/api/v1/macro/series");
       } catch {
-        return [
-          { code: "FEDFUNDS", title: "Effective Federal Funds Rate", units: "%", frequency: "Monthly", provider: "FRED" },
-          { code: "CPIAUCSL", title: "Consumer Price Index (Headline CPI)", units: "Index 1982-1984=100", frequency: "Monthly", provider: "FRED" },
-          { code: "GDPC1", title: "Real Gross Domestic Product", units: "Billions of Chained 2017 Dollars", frequency: "Quarterly", provider: "FRED" },
-          { code: "UNRATE", title: "Civilian Unemployment Rate", units: "%", frequency: "Monthly", provider: "FRED" },
-        ];
+        return [];
       }
     },
   });
 
   // Series observations query
-  const { data: seriesDetail } = useQuery({
+  const { data: seriesDetail, isLoading: isLoadingDetail } = useQuery<SeriesDetailResponse | null>({
     queryKey: ["macro-series-obs", selectedSeries],
     queryFn: async () => {
       try {
-        return await api.get<{
-          code: string;
-          title: string;
-          observations: Array<{ day: string; value: number }>;
-        }>(`/api/v1/macro/series/${selectedSeries}`);
+        return await api.get<SeriesDetailResponse>(`/api/v1/macro/series/${selectedSeries}`);
       } catch {
-        // Fallback synthetic series observations
-        const dates = [
-          "2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01",
-          "2026-05-01", "2026-06-01", "2026-07-01", "2026-08-01",
-          "2026-09-01", "2026-10-01", "2026-11-01",
-        ];
-        return {
-          code: selectedSeries,
-          title: selectedSeries,
-          observations: dates.map((d, i) => ({
-            day: d,
-            value: selectedSeries === "FEDFUNDS" ? 5.33 - i * 0.05 : 3.2 - i * 0.08,
-          })),
-        };
+        return null;
       }
     },
+    enabled: Boolean(selectedSeries),
   });
 
-  const curveData = yieldCurve?.curve || [];
-  const spread = yieldCurve?.spread_10y_2y ?? 0;
+  const curvePoints = (yieldCurve?.curve || []).filter((c) => c.rate !== null) as Array<{
+    tenor: string;
+    rate: number;
+    as_of?: string | null;
+  }>;
+  const spread = yieldCurve?.spread_10y_2y;
   const isInverted = yieldCurve?.is_inverted ?? false;
+  const isFredConfigured = yieldCurve?.configured ?? true;
+  const curveAsOf = yieldCurve?.as_of;
 
   return (
     <div className="space-y-6">
@@ -152,7 +129,7 @@ export default function Macro() {
             <h1 className="text-2xl font-semibold tracking-tight text-white">Macroeconomic Dashboard</h1>
           </div>
           <p className="mt-1 text-sm text-neutral-400">
-            Yield curve structure, central bank rates, foreign exchange, and key economic indicators.
+            Yield curve structure, central bank policy rates, foreign exchange, and key economic indicators.
           </p>
         </div>
         <Button
@@ -166,6 +143,25 @@ export default function Macro() {
         </Button>
       </div>
 
+      {/* Warning banner when FRED key is not configured */}
+      {!isFredConfigured && (
+        <div
+          className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4 text-amber-200"
+          data-testid="fred-not-configured-banner"
+        >
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-medium text-amber-300">FRED key not configured</p>
+              <p className="text-xs text-amber-400/80 mt-0.5">
+                Set <code className="bg-amber-900/50 px-1 py-0.5 rounded text-amber-200">FRED_API_KEY</code> in{" "}
+                <code className="bg-amber-900/50 px-1 py-0.5 rounded text-amber-200">.env</code> to ingest live Federal Reserve economic data and complete US Treasury yield curve tenors.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Yield Curve & Key Stats Overview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Panel className="p-5 lg:col-span-2">
@@ -173,46 +169,65 @@ export default function Macro() {
             <div>
               <h2 className="text-base font-medium text-white">US Treasury Yield Curve</h2>
               <p className="text-xs text-neutral-400">
-                Term structure of benchmark sovereign yields (As of {yieldCurve?.as_of})
+                Term structure of benchmark sovereign yields{" "}
+                {curveAsOf ? `(As of ${curveAsOf})` : "(No observations ingested)"}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {isInverted ? (
-                <Badge tone="negative" className="flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Inverted Curve
-                </Badge>
+              {curvePoints.length > 0 ? (
+                isInverted ? (
+                  <Badge tone="negative" className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Inverted Curve
+                  </Badge>
+                ) : (
+                  <Badge tone="positive" className="flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" /> Normal Curve
+                  </Badge>
+                )
               ) : (
-                <Badge tone="positive" className="flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" /> Normal Curve
+                <Badge tone="neutral" className="flex items-center gap-1">
+                  <Info className="h-3 w-3" /> Data Unavailable
                 </Badge>
               )}
             </div>
           </div>
 
           <div className="h-64 w-full" data-testid="yield-curve-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={curveData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                <XAxis dataKey="tenor" stroke="#737373" />
-                <YAxis
-                  stroke="#737373"
-                  domain={["auto", "auto"]}
-                  tickFormatter={(v) => `${v.toFixed(2)}%`}
-                />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", color: "#fff" }}
-                  formatter={(val: number) => [`${val.toFixed(2)}%`, "Yield"]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="rate"
-                  stroke="#38bdf8"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: "#38bdf8" }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {curvePoints.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={curvePoints} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                  <XAxis dataKey="tenor" stroke="#737373" />
+                  <YAxis
+                    stroke="#737373"
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v) => `${Number(v).toFixed(2)}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", color: "#fff" }}
+                    formatter={(val: number) => [`${Number(val).toFixed(2)}%`, "Yield"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="rate"
+                    stroke="#38bdf8"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "#38bdf8" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center text-center text-neutral-400 p-6">
+                <Info className="h-8 w-8 text-neutral-500 mb-2" />
+                <p className="text-sm font-medium text-neutral-300">
+                  {isLoadingCurve ? "Loading yield curve data..." : (yieldCurve?.message || "Yield curve data unavailable")}
+                </p>
+                <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                  Run macro ingestion with a configured FRED key to populate benchmark Treasury tenors.
+                </p>
+              </div>
+            )}
           </div>
         </Panel>
 
@@ -223,15 +238,23 @@ export default function Macro() {
               10Y - 2Y Yield Spread
             </span>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className={`text-3xl font-bold font-mono ${spread < 0 ? "text-rose-400" : "text-emerald-400"}`}>
-                {spread >= 0 ? `+${(spread * 100).toFixed(0)} bps` : `${(spread * 100).toFixed(0)} bps`}
-              </span>
-              <span className="text-xs text-neutral-400">({spread.toFixed(2)}%)</span>
+              {spread !== null && spread !== undefined ? (
+                <>
+                  <span className={`text-3xl font-bold font-mono ${spread < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                    {spread >= 0 ? `+${(spread * 100).toFixed(0)} bps` : `${(spread * 100).toFixed(0)} bps`}
+                  </span>
+                  <span className="text-xs text-neutral-400">({spread.toFixed(2)}%)</span>
+                </>
+              ) : (
+                <span className="text-lg font-mono text-neutral-500">Unavailable</span>
+              )}
             </div>
             <p className="mt-2 text-xs text-neutral-400">
-              {spread < 0
-                ? "Curve inversion indicates heightened market anticipation of economic deceleration."
-                : "Upward sloping curve represents standard term premium and economic expansion expectation."}
+              {spread !== null && spread !== undefined
+                ? spread < 0
+                  ? "Curve inversion indicates heightened market anticipation of economic deceleration."
+                  : "Upward sloping curve represents standard term premium and economic expansion expectation."
+                : "Spread calculation requires both 10Y and 2Y constant maturity observations."}
             </p>
           </Panel>
 
@@ -240,10 +263,12 @@ export default function Macro() {
               Benchmark 10-Year
             </span>
             <div className="mt-2 text-3xl font-bold font-mono text-white">
-              {curveData.find((c) => c.tenor === "10Y")?.rate.toFixed(2) ?? "4.37"}%
+              {curvePoints.find((c) => c.tenor === "10Y")?.rate !== undefined
+                ? `${curvePoints.find((c) => c.tenor === "10Y")?.rate?.toFixed(2)}%`
+                : "—"}
             </div>
             <p className="mt-1 text-xs text-neutral-400">
-              Global risk-free hurdle discount rate used across DCF valuations.
+              Global risk-free hurdle discount rate used across DCF valuations {curveAsOf ? `(as of ${curveAsOf})` : ""}.
             </p>
           </Panel>
         </div>
@@ -261,21 +286,27 @@ export default function Macro() {
             <Badge tone="neutral">{fxRates.length} Pairs</Badge>
           </div>
 
-          <div className="divide-y divide-neutral-800">
-            {fxRates.map((fx) => (
-              <div key={fx.pair} className="flex items-center justify-between py-2.5">
-                <div>
-                  <span className="font-semibold text-sm text-white">{fx.pair}</span>
-                  <p className="text-xs text-neutral-400">{fx.date}</p>
+          {fxRates.length > 0 ? (
+            <div className="divide-y divide-neutral-800">
+              {fxRates.map((fx) => (
+                <div key={fx.pair} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <span className="font-semibold text-sm text-white">{fx.pair}</span>
+                    <p className="text-xs text-neutral-400">As of {fx.date}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-sm font-semibold text-neutral-100">
+                      {fx.rate.toFixed(4)}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-mono text-sm font-semibold text-neutral-100">
-                    {fx.rate.toFixed(4)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-xs text-neutral-500">
+              No FX exchange rates ingested yet.
+            </div>
+          )}
         </Panel>
 
         {/* Macro Series Observations Explorer */}
@@ -285,20 +316,23 @@ export default function Macro() {
               <h2 className="text-base font-medium text-white">Indicator Series Explorer</h2>
               <p className="text-xs text-neutral-400">
                 Official macroeconomic series from FRED & sovereign providers
+                {seriesDetail?.as_of ? ` (As of ${seriesDetail.as_of})` : ""}
               </p>
             </div>
-            <select
-              value={selectedSeries}
-              onChange={(e) => setSelectedSeries(e.target.value)}
-              className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 focus:border-brand-500 focus:outline-none"
-              data-testid="macro-series-select"
-            >
-              {macroSeries.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.code} - {s.title}
-                </option>
-              ))}
-            </select>
+            {macroSeries.length > 0 && (
+              <select
+                value={selectedSeries}
+                onChange={(e) => setSelectedSeries(e.target.value)}
+                className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 focus:border-brand-500 focus:outline-none"
+                data-testid="macro-series-select"
+              >
+                {macroSeries.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.code} - {s.title}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {seriesDetail?.observations && seriesDetail.observations.length > 0 ? (
@@ -310,7 +344,7 @@ export default function Macro() {
                   <YAxis stroke="#737373" domain={["auto", "auto"]} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", color: "#fff" }}
-                    formatter={(val: number) => [val.toFixed(2), selectedSeries]}
+                    formatter={(val: number) => [Number(val).toFixed(2), selectedSeries]}
                   />
                   <Line
                     type="monotone"
@@ -323,8 +357,14 @@ export default function Macro() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex h-60 items-center justify-center text-neutral-400 text-sm">
-              Loading series observations...
+            <div className="flex h-60 flex-col items-center justify-center text-neutral-400 text-sm p-4 text-center">
+              <Info className="h-6 w-6 text-neutral-500 mb-2" />
+              <p className="font-medium text-neutral-300">
+                {isLoadingDetail ? "Loading series observations..." : "No series observations recorded"}
+              </p>
+              <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                Series data is ingested through the macro worker job from the Federal Reserve Economic Data API.
+              </p>
             </div>
           )}
         </Panel>

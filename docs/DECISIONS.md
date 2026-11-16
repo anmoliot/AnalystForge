@@ -246,3 +246,20 @@ vendor errors.
 4. Establish repository-wide AST/source test `test_no_random_or_fabricated_data_in_codebase` guarding against unauthorized random calls.
 
 **Consequences:** The analysis engine strictly reports missing data rather than fabricating numbers. The UI displays informative data-unavailable states with missing ticker details.
+
+## ADR-016 — FRED and Groq OpenAI-Compatible LLM Provider Integration
+
+**Status:** Accepted
+
+**Context:** The platform requires macroeconomic data integration (US Treasury yield curve tenors, CPI, unemployment, GDP, policy rates, credit spreads) via FRED, and an intelligent research assistant using high-throughput OpenAI-compatible LLM endpoints (specifically Groq free/paid tiers). The integration must remain resilient against rate limits and dynamic model decommissioning while never leaking credentials.
+
+**Decision:**
+1. Upgrade `FredProvider` to read `FRED_API_KEY` from configuration / environment while preserving the public CSV download as an unauthenticated fallback. Macro dashboard endpoints report explicit `"FRED key not configured"` or `"No yield curve data ingested yet"` states with as-of observation timestamps.
+2. Introduce `LLMProvider` abstraction with ports for `none`, `openai-compatible` (Groq, OpenAI, vLLM, Ollama), `anthropic`, and `DeterministicFakeLLMProvider` (for deterministic unit/CI testing).
+3. Implement `TokenBucket` rate limiter tracking `LLM_REQUESTS_PER_MINUTE` and exponential backoff honoring `429` with `Retry-After` headers, returning clear `"LLM rate limited, retry in N s"` feedback.
+4. Implement dynamic model discovery via `GET {base}/models` at startup to verify `LLM_MODEL`, falling back to `LLM_FALLBACK_MODEL` or active chat models, filtering out guardrail/embedding models.
+5. Bound retrieved context using `_trim_messages` capped to `LLM_MAX_INPUT_TOKENS`, preserving system directives and recent queries while pruning intermediate retrieved passages.
+6. Provide diagnostic self-check endpoint `GET /api/v1/meta/integrations` reporting connectivity and resolved models without exposing keys.
+7. Maintain offline CI compatibility using deterministic fake fixtures, while offering marked `pytest -m live` suite for real key verification.
+
+**Consequences:** Seamless Groq and FRED support with zero key exposure, strict rate limit compliance, and zero test breakage across offline CI environments.

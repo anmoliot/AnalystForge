@@ -31,6 +31,7 @@ def build_app_registry(settings: Settings, redis_client: Any | None = None) -> P
             cache=cache,
             timeout_seconds=settings.http_timeout_seconds,
             cooldown_seconds=settings.provider_cooldown_seconds,
+            fred_api_key=settings.provider_key("fred"),
         )
     )
 

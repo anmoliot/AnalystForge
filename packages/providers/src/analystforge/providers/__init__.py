@@ -33,22 +33,40 @@ from analystforge.providers.models import (
 from analystforge.providers.quality import QualityIssue, check_bars
 from analystforge.providers.registry import ProviderConfig, ProviderRegistry, build_registry
 from analystforge.providers.router import Attempt, FailoverTrace, ProviderRouter
+from analystforge.providers.llm import (
+    AnthropicProvider,
+    ChatMessage,
+    DeterministicFakeLLMProvider,
+    LLMProvider,
+    LLMRateLimitError,
+    LLMResponse,
+    NoneLLMProvider,
+    OpenAICompatibleProvider,
+    TokenBucket,
+    ToolCall,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
     "AllProvidersFailedError",
+    "AnthropicProvider",
     "Attempt",
     "Bar",
     "Capability",
+    "ChatMessage",
     "CompanyFacts",
     "CorporateAction",
+    "DeterministicFakeLLMProvider",
     "FailoverTrace",
     "Filing",
     "FundamentalFact",
     "FundamentalsProvider",
     "FxProvider",
     "FxRate",
+    "LLMProvider",
+    "LLMRateLimitError",
+    "LLMResponse",
     "MacroPoint",
     "MacroProvider",
     "MacroSeries",
@@ -56,6 +74,8 @@ __all__ = [
     "MemoryCache",
     "NewsItem",
     "NewsProvider",
+    "NoneLLMProvider",
+    "OpenAICompatibleProvider",
     "PriceSeries",
     "PricesProvider",
     "Provider",
@@ -69,6 +89,8 @@ __all__ = [
     "QualityIssue",
     "RedisCache",
     "ResponseCache",
+    "TokenBucket",
+    "ToolCall",
     "build_registry",
     "check_bars",
 ]

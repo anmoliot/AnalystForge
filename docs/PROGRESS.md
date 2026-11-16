@@ -1,7 +1,27 @@
-# Progress
+# Progress and Truthful Work Package Status
 
-Updated at the end of every phase. Status is evidence-based: a phase is complete only when its
-exit criteria were executed, not merely written.
+Updated continuously. Status is strictly evidence-based: a work package or phase is complete only when its exit criteria were actually executed and proven by automated test suites.
+
+## Work Packages Status (Master Remediation Plan)
+
+| Work Package | Scope | Status | Executed Evidence |
+|---|---|---|---|
+| **WP0** | Secrets, FRED integration & Groq LLM Provider | **Complete** | `.env.example` documented with FRED and Groq keys without secrets; `packages/providers/src/analystforge/providers/llm.py` implemented with `TokenBucket` rate limiter, dynamic model discovery, exponential backoff on 429 (`Retry-After`), context trimming, streaming, tool calls, and JSON structured modes; diagnostic self-check endpoint `GET /api/v1/meta/integrations` tested (`test_integrations_meta.py`); live integration test suite (`tests/test_live_integrations.py -m live`) executed and passing against live FRED and Groq APIs; 67 provider tests and 66 API tests pass. |
+| **WP1** | Remove fabricated/random data | **Complete** | Deleted `np.random.normal` from `routers/portfolio.py` and `routers/backtest.py`; missing price data returns HTTP 422 `DataUnavailableError`; replaced `np.random.seed(42)` in `services/valuation.py` with scoped `numpy.random.default_rng(seed)`; explicit `seed` parameter and response field in `/api/v1/valuation/dcf/montecarlo`; repository-wide AST test `test_no_random_or_fabricated_data_in_codebase` passes; frontend alerts render in `Portfolios.tsx`. Committed in `aab2fb4`. |
+| **WP2** | Valuation completeness (FCFE, Comps, DDM, SOTP, WACC builder, Football Field) | In Progress | Quant models, API routes, and live formula Excel generation. |
+| **WP3** | Portfolio gaps (XIRR, Brinson-Fachler, Black-Litterman, factor exposure) | Planned | |
+| **WP4** | Backtesting (Rule builder, sandboxed strategy runner, walk-forward, sweep) | Planned | |
+| **WP5** | Screener, macro, alerts, watchlists (Live worker evaluation, email/webhook delivery) | Planned | |
+| **WP6** | News, filings & Groq research assistant (Grounded citations, tool calls, 50-Q eval set) | Planned | |
+| **WP7** | Reporting and exports (PDF, PPTX tear sheets, Excel live formulas, Python SDK) | Planned | |
+| **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | Planned | |
+| **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | Planned | |
+| **WP10** | Hardening & audits (Security, accessibility, performance) | Planned | |
+| **WP11** | Truthful documentation & release | Planned | |
+
+---
+
+## Phase Audit Baseline
 
 | Phase | Scope | Status | Evidence |
 |---|---|---|---|

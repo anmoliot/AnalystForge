@@ -26,6 +26,7 @@ class ProviderConfig:
     cache: ResponseCache | None = None
     timeout_seconds: float = 30.0
     cooldown_seconds: float = 300.0
+    fred_api_key: str | None = None
 
 
 @dataclass(slots=True)
@@ -102,6 +103,7 @@ def build_registry(config: ProviderConfig) -> ProviderRegistry:
     macro: list[Provider] = [
         FredProvider(
             user_agent=config.user_agent,
+            api_key=config.fred_api_key,
             cache=config.cache,
             timeout_seconds=config.timeout_seconds,
         )

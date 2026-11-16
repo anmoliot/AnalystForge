@@ -37,6 +37,7 @@ addopts = "-ra --strict-markers"
 markers = [
   "network: tests that require live internet access (deselected by default)",
   "slow: long-running tests",
+  "live: tests that run against live third-party APIs with real credentials in .env",
 ]
 filterwarnings = [
   "error::DeprecationWarning:analystforge.*",
