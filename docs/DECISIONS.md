@@ -282,3 +282,28 @@ vendor errors.
 4. Surface interactive tabs in frontend `Portfolios.tsx` for rebalance order execution, factor exposures, and rolling metrics.
 
 **Consequences:** The platform provides institutional-grade portfolio risk, rebalance execution, and multi-factor analytics while preserving zero-fabricated-data guarantees.
+
+## ADR-018 — Quantitative Backtesting Architecture: Sandboxed Subprocess Execution, Rule Builder, Walk-Forward Analysis, and DSR Overfitting Deflation
+
+**Status:** Accepted
+
+**Context:** Strategy backtesting previously contained only rudimentary built-in indicators without realistic market frictions (slippage, short borrow accrual), lacked rule-builder condition trees (nested AND/OR), offered no mechanism for running custom analyst Python strategies securely, lacked walk-forward cross-validation, and failed to guard against look-ahead bias, selection bias, and backtest overfitting.
+
+**Decision:**
+1. **Pure Quantitative Backtest Core (`packages/quant/backtest/`):**
+   - `indicators.py`: Pure implementations of SMA, EMA, Wilder's RSI, Bollinger Bands, MACD, and ATR.
+   - `rules.py`: Recursive AST-style boolean rule-tree evaluator supporting AND/OR combinators, technical indicator conditions, and crossing events.
+   - `simulation.py`: Real-world market simulation modeling percentage and fixed slippage per share, annualized daily borrow interest on short positions, per-trade and volume-based broker commissions, and execution lag ($t+1$) to ensure realistic order fills.
+   - `overfitting.py`: Probabilistic Sharpe Ratio (PSR) and Deflated Sharpe Ratio (DSR) (Bailey & Lopez de Prado, 2014) accounting for non-normality (skewness, kurtosis) and multiple-testing selection bias across $K$ trials. Look-ahead bias detector validating that signals at bar $t$ remain invariant under future truncation and price perturbations.
+   - `walk_forward.py`: Out-of-sample and multi-fold rolling walk-forward analysis evaluating in-sample vs out-of-sample degradation and Walk-Forward Efficiency (WFE).
+   - `sweep.py`: 2D parameter grid sweeps generating interactive performance matrices (Sharpe, Return, Drawdown) and evaluating family-wide DSR.
+2. **Sandboxed Python Strategy Runner (`packages/quant/backtest/sandbox.py`):**
+   - Multi-layered defense: Pre-execution AST scanner rejecting unauthorized modules (`os`, `subprocess`, `socket`, `urllib`, `requests`, `pathlib`, `ctypes`, etc.), forbidden built-in calls (`open`, `eval`, `exec`, `__import__`, `compile`), and dunder traversal (`__subclasses__`, `__bases__`, `__globals__`).
+   - Isolated spawned child process running with strict operating system resource limits (`RLIMIT_CPU`, `RLIMIT_DATA`, `RLIMIT_AS`, `RLIMIT_FSIZE=0`), walled off from filesystem writes and network sockets, bounded by a strict wall-clock timeout.
+3. **API & Background Worker Integration:**
+   - Endpoints: `POST /backtests/rules`, `POST /backtests/custom-python`, `POST /backtests/walk-forward`, `POST /backtests/sweep`, `POST /backtests/jobs`, `GET /backtests/jobs/{id}`, `POST /backtests/jobs/{id}/cancel`.
+   - Explicit survivorship bias disclosures appended to all single-instrument backtests.
+4. **Frontend Backtest Lab (`apps/web/src/pages/Backtest.tsx`):**
+   - 5 dedicated operational modes: Standard Models, Rule Builder (interactive condition builder), Sandboxed Python code editor, Walk-Forward Cross-Validation tables, and 2D Parameter Heatmaps.
+
+**Consequences:** Enables secure, institutional-grade strategy prototyping and backtesting with zero risk of server compromise or undetected look-ahead and overfitting bias.

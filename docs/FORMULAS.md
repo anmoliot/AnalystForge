@@ -109,3 +109,33 @@ $$\text{Prior Equilibrium Returns}: \Pi = \delta \Sigma w_{\text{mkt}}$$
 $$\text{Posterior Returns}: E[R] = \left[ (\tau \Sigma)^{-1} + P^T \Omega^{-1} P \right]^{-1} \left[ (\tau \Sigma)^{-1} \Pi + P^T \Omega^{-1} Q \right]$$
 $$\text{Posterior Covariance}: \Sigma_{\text{post}} = \Sigma + \left[ (\tau \Sigma)^{-1} + P^T \Omega^{-1} P \right]^{-1}$$
 $$\text{Optimal Weights}: w^* = (\delta \Sigma_{\text{post}})^{-1} E[R]$$
+
+---
+
+## 3. Quantitative Backtesting & Overfitting Diagnostics
+
+### 3.1 Market Friction Modeling
+$$\text{Long Entry Execution Price}: P_{\text{entry}} = P_t \times (1 + \text{Slippage}_{\text{bps}} \times 10^{-4}) + \text{Fixed Slippage}$$
+$$\text{Long Exit Execution Price}: P_{\text{exit}} = P_t \times (1 - \text{Slippage}_{\text{bps}} \times 10^{-4}) - \text{Fixed Slippage}$$
+$$\text{Short Execution Price}: P_{\text{short}} = P_t \times (1 - \text{Slippage}_{\text{bps}} \times 10^{-4}) - \text{Fixed Slippage}$$
+$$\text{Cover Execution Price}: P_{\text{cover}} = P_t \times (1 + \text{Slippage}_{\text{bps}} \times 10^{-4}) + \text{Fixed Slippage}$$
+$$\text{Broker Commission}: C_t = \text{Commission}_{\text{fixed}} + \text{Trade Value} \times \text{Commission}_{\text{bps}} \times 10^{-4}$$
+$$\text{Daily Overnight Borrow Cost}: B_t = |Q_t| \times P_t \times \frac{\text{Borrow Cost Annualized}}{365}$$
+
+### 3.2 Probabilistic Sharpe Ratio (PSR)
+$$\text{Var}(\widehat{SR}) = \frac{1 - \hat{\gamma}_3 \widehat{SR} + \frac{\hat{\gamma}_4 - 1}{4} \widehat{SR}^2}{N - 1}$$
+$$Z = \frac{\widehat{SR} - SR^*}{\sqrt{\text{Var}(\widehat{SR})}}$$
+$$\text{PSR}(SR^*) = \Phi(Z)$$
+where $\hat{\gamma}_3$ is return skewness, $\hat{\gamma}_4$ is return kurtosis, and $N$ is the number of return periods.
+
+### 3.3 Deflated Sharpe Ratio (DSR)
+When $K$ trials or parameter sets are tested, the expected maximum Sharpe ratio under the null hypothesis (true $SR = 0$) is:
+$$\mathbb{E}[\max_{k=1\dots K} SR_k] \approx \sigma_{SR} \left[ (1 - \gamma) \Phi^{-1}\left(1 - \frac{1}{K}\right) + \gamma \Phi^{-1}\left(1 - \frac{1}{K \cdot e}\right) \right]$$
+where $\gamma \approx 0.5772$ (Euler-Mascheroni constant) and $\sigma_{SR}$ is the standard deviation across trial Sharpe ratios.
+$$\text{DSR} = \text{PSR}\left( \mathbb{E}[\max_{k} SR_k] \right)$$
+A strategy with $\text{DSR} < 0.95$ triggers a moderate overfitting alert; $\text{DSR} < 0.50$ flags severe multiple-testing bias.
+
+### 3.4 Walk-Forward Efficiency (WFE)
+$$\text{WFE} = \frac{\frac{1}{M} \sum_{m=1}^M SR_{\text{OOS}, m}}{\frac{1}{M} \sum_{m=1}^M SR_{\text{IS}, m}}$$
+$$\text{Sharpe Degradation}_m = \frac{SR_{\text{OOS}, m} - SR_{\text{IS}, m}}{SR_{\text{IS}, m}} \times 100\%$$
+A $\text{WFE} < 50\%$ indicates severe parameter decay and regime sensitivity.
