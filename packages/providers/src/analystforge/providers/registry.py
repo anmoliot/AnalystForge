@@ -11,11 +11,18 @@ from analystforge.providers.fundamentals.sec_edgar import SecEdgarProvider
 from analystforge.providers.fx.ecb import EcbFxProvider
 from analystforge.providers.macro.fred import FredProvider
 from analystforge.providers.news.rss import RssNewsProvider
+from analystforge.providers.prices.alphavantage import AlphaVantagePricesProvider
 from analystforge.providers.prices.stooq import StooqProvider
+from analystforge.providers.prices.twelvedata import TwelveDataPricesProvider
 from analystforge.providers.prices.yahoo import YahooPricesProvider
 from analystforge.providers.router import ProviderRouter
 
-_PRICE_ADAPTERS = {"yahoo": YahooPricesProvider, "stooq": StooqProvider}
+_PRICE_ADAPTERS = {
+    "yahoo": YahooPricesProvider,
+    "stooq": StooqProvider,
+    "alphavantage": AlphaVantagePricesProvider,
+    "twelvedata": TwelveDataPricesProvider,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +34,8 @@ class ProviderConfig:
     timeout_seconds: float = 30.0
     cooldown_seconds: float = 300.0
     fred_api_key: str | None = None
+    alphavantage_api_key: str | None = None
+    twelvedata_api_key: str | None = None
 
 
 @dataclass(slots=True)
@@ -85,14 +94,19 @@ def build_registry(config: ProviderConfig) -> ProviderRegistry:
         raise ValueError(
             f"Unknown price provider(s) {unknown}; valid names are {sorted(_PRICE_ADAPTERS)}"
         )
-    prices = [
-        _PRICE_ADAPTERS[name](
-            user_agent=config.user_agent,
-            cache=config.cache,
-            timeout_seconds=config.timeout_seconds,
-        )
-        for name in config.prices_order
-    ]
+    prices = []
+    for name in config.prices_order:
+        adapter_cls = _PRICE_ADAPTERS[name]
+        kwargs: dict[str, Any] = {
+            "user_agent": config.user_agent,
+            "cache": config.cache,
+            "timeout_seconds": config.timeout_seconds,
+        }
+        if name == "alphavantage":
+            kwargs["api_key"] = config.alphavantage_api_key
+        elif name == "twelvedata":
+            kwargs["api_key"] = config.twelvedata_api_key
+        prices.append(adapter_cls(**kwargs))
     fundamentals: list[Provider] = [
         SecEdgarProvider(
             user_agent=config.user_agent,

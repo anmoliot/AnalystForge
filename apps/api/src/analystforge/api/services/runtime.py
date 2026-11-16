@@ -32,6 +32,8 @@ def build_app_registry(settings: Settings, redis_client: Any | None = None) -> P
             timeout_seconds=settings.http_timeout_seconds,
             cooldown_seconds=settings.provider_cooldown_seconds,
             fred_api_key=settings.provider_key("fred"),
+            alphavantage_api_key=settings.provider_key("alphavantage"),
+            twelvedata_api_key=settings.provider_key("twelvedata"),
         )
     )
 

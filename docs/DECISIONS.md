@@ -384,3 +384,27 @@ vendor errors.
 
 **Consequences:** Enables zero-touch institutional publishing, automated email distribution, live spreadsheet auditability, and programmatic Python workflows.
 
+---
+
+## ADR-022: Secondary Price Providers (Alpha Vantage & Twelve Data) and Multi-Source Failover Pipeline
+
+**Status:** Accepted (Work Package 8)  
+**Context:** The primary price source (Yahoo Finance) is unauthenticated and Stooq frequently presents anti-bot browser challenges to programmatic HTTP clients. A robust institutional platform requires secondary, key-authenticated market data adapters with automated failover and health tracking.
+
+**Decisions:**
+1. **Secondary Providers Added:**
+   - `TwelveDataPricesProvider` (`packages/providers/src/analystforge/providers/prices/twelvedata.py`): Key-authenticated via `TWELVE_DATA_API_KEY`, supporting global equities and high-granularity daily OHLCV.
+   - `AlphaVantagePricesProvider` (`packages/providers/src/analystforge/providers/prices/alphavantage.py`): Key-authenticated via `ALPHA_VANTAGE_API_KEY`, supporting daily adjusted OHLCV, split coefficients, and dividend cash events.
+2. **Dynamic Configuration:**
+   - Providers declare `is_configured() -> bool`. Unconfigured providers are gracefully bypassed in router queues without blocking.
+   - Pacing limiters prevent vendor rate-limit breaches (Alpha Vantage 1.2s, Twelve Data 0.8s).
+3. **Resilient Failover Pipeline:**
+   - `ProviderRouter` tests each configured adapter sequentially.
+   - If Yahoo fails (HTTP 500) and Stooq fails (browser challenge), the router seamlessly advances to Twelve Data or Alpha Vantage.
+   - Every attempt, latency, and failure message is recorded in `FailoverTrace` and logged to `ProviderHealthRecord` for operational transparency.
+4. **Continental European Coverage:**
+   - Verified reference universe coverage encompassing Deutsche Börse XETRA alongside NASDAQ and LSE.
+
+**Consequences:** Eliminates market data single-point-of-failure risks and enables reliable execution across international markets under active vendor rate limits or challenges.
+
+
