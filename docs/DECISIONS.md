@@ -307,3 +307,29 @@ vendor errors.
    - 5 dedicated operational modes: Standard Models, Rule Builder (interactive condition builder), Sandboxed Python code editor, Walk-Forward Cross-Validation tables, and 2D Parameter Heatmaps.
 
 **Consequences:** Enables secure, institutional-grade strategy prototyping and backtesting with zero risk of server compromise or undetected look-ahead and overfitting bias.
+
+## ADR-019 — Screener Condition Trees, Alert Dispatch Pipeline, Collaboration Suite, and Expiring Public Shares
+
+**Status:** Accepted
+
+**Context:** The screener lacked recursive boolean condition grouping (AND/OR trees) and scheduled automated exports. Alert rules were passive database rows without worker execution, delivery audit logging, or real SMTP/webhook dispatch. Analysts lacked collaborative tools (watchlists, persistent commentary/notes on tickers/portfolios) and secure, time-bound read-only share links for external stakeholders.
+
+**Decision:**
+1. **Screener Boolean Tree & Scheduled Execution:**
+   - Implement `ScreenerGroup` with recursive evaluation of child conditions (`field`, `operator`, `value`) combined with `match_all` (AND) or `match_any` (OR).
+   - Ingest and query real instrument market data and fundamental metrics without random/hash values.
+   - Support streaming CSV and JSON exports (`GET /screener/export`).
+   - Add scheduled execution trigger (`POST /screener/saved/{id}/run` and `POST /screener/saved/{id}/schedule`) that runs the screen, generates a CSV payload, and dispatches it via SMTP.
+2. **Alert Rule Evaluation & Multi-Channel Delivery:**
+   - Implement asynchronous alert evaluation engine (`services/alerts.py`) evaluating price thresholds, RSI levels, and volume spikes against live database records.
+   - Support multi-channel delivery: in-app notifications, asynchronous SMTP email dispatch (`send_alert_email` via `asyncio.to_thread`), and webhooks (`send_alert_webhook` via `httpx.AsyncClient`).
+   - Track every notification attempt in an immutable `alert_deliveries` audit table with status (`sent`, `failed`), timestamp, retry counter, and error reason.
+   - Register scheduled background cron jobs in worker (`apps/worker/src/analystforge/worker/main.py`) for `check_alerts` (every minute) and `check_scheduled_screens` (hourly).
+3. **Analyst Collaboration (Watchlists & Notes):**
+   - Provide full CRUD for multi-asset monitoring lists (`/watchlists`) with dynamic resolution of latest market prices.
+   - Provide full CRUD for analyst commentary and audit memos (`/notes`) attached to tickers, portfolios, screens, or macro indicators.
+4. **Time-Bound Expiring Share Links:**
+   - Introduce `ShareLink` model with high-entropy cryptographic token (`secrets.token_urlsafe(32)`), tenant ownership, resource binding (`portfolio`, `valuation`, `screener`, `backtest`), and configurable expiry (`expires_at`).
+   - Mount public unauthenticated read-only endpoint `GET /api/v1/public/shares/{token}` that returns resource data before expiration, returning HTTP 410 Gone when expired, and HTTP 404 when revoked.
+
+**Consequences:** Fulfills all institutional workflow requirements for alert automation, screener scheduling with SMTP verification, team collaboration, and secure time-delimited sharing.

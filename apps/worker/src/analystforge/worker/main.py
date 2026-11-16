@@ -14,6 +14,10 @@ from arq.connections import RedisSettings
 from analystforge.api.config import get_settings
 from analystforge.api.db import Database
 from analystforge.api.logging import configure_logging, get_logger
+from analystforge.api.services.alerts import (
+    evaluate_alert_rules,
+    run_scheduled_screens_and_dispatch,
+)
 from analystforge.api.services.ingest import (
     IngestionSummary,
     ingest_fundamentals,
@@ -162,6 +166,18 @@ async def ingest_all(ctx: dict[str, Any]) -> dict[str, Any]:
     return results
 
 
+async def check_alerts(ctx: dict[str, Any]) -> dict[str, Any]:
+    res = await evaluate_alert_rules(ctx["database"], settings)
+    logger.info("worker.alerts_evaluated", **res)
+    return res
+
+
+async def check_scheduled_screens(ctx: dict[str, Any]) -> dict[str, Any]:
+    res = await run_scheduled_screens_and_dispatch(ctx["database"], settings)
+    logger.info("worker.scheduled_screens_evaluated", **res)
+    return res
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -173,8 +189,12 @@ class WorkerSettings:
         update_fx,
         update_news,
         check_quality,
+        check_alerts,
+        check_scheduled_screens,
     ]
     cron_jobs: ClassVar[list[Any]] = [
+        cron(check_alerts, minute={0, 15, 30, 45}, run_at_startup=False),
+        cron(check_scheduled_screens, hour={8, 16}, minute=0, run_at_startup=False),
         cron(update_seed, hour=4, minute=7, run_at_startup=False),
         cron(update_prices, weekday={0, 1, 2, 3, 4}, hour=22, minute=37, run_at_startup=False),
         cron(update_fundamentals, hour=3, minute=17, run_at_startup=False),

@@ -1,4 +1,11 @@
-"""Macro dashboard and economic indicator APIs."""
+"""Macro dashboard and economic indicator APIs.
+
+Real FRED data only:
+- Yield curve points (1M, 3M, 6M, 1Y, 2Y, 5Y, 10Y, 30Y) with current vs historical comparison (1M ago, 1Y ago)
+- Key macro indicators: CPI, Real GDP, Civilian Unemployment Rate, Fed Funds Policy Rate, Credit Spreads (High Yield OAS)
+- Real as-of observation dates and timestamps
+- Transparent data-unavailable feedback when FRED keys or series are uningested
+"""
 
 from __future__ import annotations
 
@@ -25,8 +32,11 @@ _YIELD_CURVE_TENORS: list[tuple[str, str]] = [
 ]
 
 
-@router.get("/series", summary="Get key economic indicators and history")
+@router.get("/series", summary="Get key economic indicators and historical series")
 async def get_macro_indicators(session: SessionDep, request: Request) -> list[dict[str, Any]]:
+    settings = getattr(request.app.state, "settings", None)
+    demo_mode = getattr(settings, "demo_mode", False) if settings else False
+
     series_stmt = select(MacroSeries).order_by(MacroSeries.code)
     series_list = (await session.execute(series_stmt)).scalars().all()
 
@@ -37,7 +47,7 @@ async def get_macro_indicators(session: SessionDep, request: Request) -> list[di
             select(MacroObservation.day, MacroObservation.value)
             .where(MacroObservation.series_code == s.code)
             .order_by(desc(MacroObservation.day))
-            .limit(30)
+            .limit(60)
         )
         obs_rows = (await session.execute(obs_stmt)).fetchall()
 
@@ -63,25 +73,25 @@ async def get_macro_indicators(session: SessionDep, request: Request) -> list[di
             ],
         })
 
-    if not results:
-        # Standard benchmark indicator specifications for unseeded environments
-        standard_indicators = [
-            ("DGS10", "10-Year Treasury Constant Maturity Rate", "%", "Daily", 4.35, -0.04),
-            ("DGS2", "2-Year Treasury Constant Maturity Rate", "%", "Daily", 4.22, -0.06),
-            ("FEDFUNDS", "Federal Funds Effective Rate", "%", "Monthly", 4.83, 0.0),
-            ("CPIAUCSL", "Consumer Price Index (CPI All Urban)", "Index", "Monthly", 315.2, 0.8),
-            ("UNRATE", "Civilian Unemployment Rate", "%", "Monthly", 4.1, 0.0),
-            ("GDPC1", "Real Gross Domestic Product", "Bil. Chn. 2017 $", "Quarterly", 22850.0, 70.0),
-        ]
+    # Return empty list if no series ingested, unless explicit DEMO mode is enabled
+    if not results and demo_mode:
         today = date.today()
-        for s_id, title, units, freq, val, chg in standard_indicators:
+        standard_demo = [
+            ("DGS10", "10-Year Treasury Constant Maturity Rate [DEMO]", "%", "Daily", 4.35, -0.04),
+            ("DGS2", "2-Year Treasury Constant Maturity Rate [DEMO]", "%", "Daily", 4.22, -0.06),
+            ("FEDFUNDS", "Federal Funds Effective Rate [DEMO]", "%", "Monthly", 4.83, 0.0),
+            ("CPIAUCSL", "Consumer Price Index (CPI All Urban) [DEMO]", "Index", "Monthly", 315.2, 0.8),
+            ("UNRATE", "Civilian Unemployment Rate [DEMO]", "%", "Monthly", 4.1, 0.0),
+            ("GDPC1", "Real Gross Domestic Product [DEMO]", "Bil. Chn. 2017 $", "Quarterly", 22850.0, 70.0),
+        ]
+        for s_id, title, units, freq, val, chg in standard_demo:
             results.append({
                 "code": s_id,
                 "id": s_id,
                 "title": title,
                 "units": units,
                 "frequency": freq,
-                "provider": "FRED",
+                "provider": "DEMO",
                 "latest_value": val,
                 "latest_date": today.isoformat(),
                 "as_of": today.isoformat(),
@@ -98,65 +108,83 @@ async def get_macro_indicators(session: SessionDep, request: Request) -> list[di
 @router.get("/series/{code}", summary="Get detailed observations for a macroeconomic series")
 async def get_series_detail(code: str, session: SessionDep) -> dict[str, Any]:
     series = await session.get(MacroSeries, code)
-    if series:
-        obs_stmt = (
-            select(MacroObservation.day, MacroObservation.value)
-            .where(MacroObservation.series_code == code)
-            .order_by(MacroObservation.day.asc())
-            .limit(365)
-        )
-        obs_rows = (await session.execute(obs_stmt)).fetchall()
-        latest_date = obs_rows[-1][0].isoformat() if obs_rows else None
-        return {
-            "code": series.code,
-            "title": series.title,
-            "units": series.units,
-            "frequency": series.frequency,
-            "as_of": latest_date,
-            "observations": [
-                {"day": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
-                for r in obs_rows
-                if r[1] is not None
-            ],
-        }
+    if not series:
+        raise HTTPException(status_code=404, detail=f"Macro series '{code}' not found.")
 
-    # Reference indicators lookup if not yet ingested
-    today = date.today()
+    obs_stmt = (
+        select(MacroObservation.day, MacroObservation.value)
+        .where(MacroObservation.series_code == code)
+        .order_by(MacroObservation.day.asc())
+        .limit(365)
+    )
+    obs_rows = (await session.execute(obs_stmt)).fetchall()
+    latest_date = obs_rows[-1][0].isoformat() if obs_rows else None
     return {
-        "code": code,
-        "title": code,
-        "units": "%",
-        "frequency": "Monthly",
-        "as_of": today.isoformat(),
+        "code": series.code,
+        "title": series.title,
+        "units": series.units,
+        "frequency": series.frequency,
+        "as_of": latest_date,
         "observations": [
-            {"day": (today - timedelta(days=i * 30)).isoformat(), "value": round(4.5 - i * 0.05, 2)}
-            for i in reversed(range(12))
+            {"day": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
+            for r in obs_rows
+            if r[1] is not None
         ],
     }
 
 
-@router.get("/yield-curve", summary="US Treasury yield curve structure and slope")
+@router.get("/yield-curve", summary="US Treasury yield curve structure, historical comparisons, and slope")
 async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, Any]:
     settings = getattr(request.app.state, "settings", None)
     fred_configured = bool(settings.provider_key("fred")) if settings else False
+    demo_mode = getattr(settings, "demo_mode", False) if settings else False
 
     curve_tenors: list[dict[str, Any]] = []
+    curve_1m_ago: list[dict[str, Any]] = []
+    curve_1y_ago: list[dict[str, Any]] = []
+
     latest_days: list[date] = []
     rate_map: dict[str, float] = {}
 
     for tenor, code in _YIELD_CURVE_TENORS:
-        stmt = (
+        # Latest observation
+        stmt_latest = (
             select(MacroObservation.day, MacroObservation.value)
             .where(MacroObservation.series_code == code)
             .order_by(desc(MacroObservation.day))
             .limit(1)
         )
-        row = (await session.execute(stmt)).first()
+        row = (await session.execute(stmt_latest)).first()
         if row and row[1] is not None:
             rate_val = float(row[1])
             rate_map[code] = rate_val
-            curve_tenors.append({"tenor": tenor, "rate": rate_val, "as_of": row[0].isoformat()})
-            latest_days.append(row[0])
+            obs_day: date = row[0]
+            latest_days.append(obs_day)
+            curve_tenors.append({"tenor": tenor, "rate": rate_val, "as_of": obs_day.isoformat()})
+
+            # Historical 1 Month Ago (~30 days prior)
+            target_1m = obs_day - timedelta(days=30)
+            stmt_1m = (
+                select(MacroObservation.day, MacroObservation.value)
+                .where(MacroObservation.series_code == code, MacroObservation.day <= target_1m)
+                .order_by(desc(MacroObservation.day))
+                .limit(1)
+            )
+            row_1m = (await session.execute(stmt_1m)).first()
+            if row_1m and row_1m[1] is not None:
+                curve_1m_ago.append({"tenor": tenor, "rate": float(row_1m[1]), "as_of": row_1m[0].isoformat()})
+
+            # Historical 1 Year Ago (~365 days prior)
+            target_1y = obs_day - timedelta(days=365)
+            stmt_1y = (
+                select(MacroObservation.day, MacroObservation.value)
+                .where(MacroObservation.series_code == code, MacroObservation.day <= target_1y)
+                .order_by(desc(MacroObservation.day))
+                .limit(1)
+            )
+            row_1y = (await session.execute(stmt_1y)).first()
+            if row_1y and row_1y[1] is not None:
+                curve_1y_ago.append({"tenor": tenor, "rate": float(row_1y[1]), "as_of": row_1y[0].isoformat()})
 
     if curve_tenors:
         rate_10y = rate_map.get("DGS10")
@@ -174,33 +202,54 @@ async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, An
             "spread_10y_2y": spread_10_2,
             "is_inverted": is_inverted,
             "curve": curve_tenors,
+            "curve_1m_ago": curve_1m_ago,
+            "curve_1y_ago": curve_1y_ago,
         }
 
-    # Reference curve when DB has no observations ingested yet
-    today = date.today()
-    default_curve = [
-        {"tenor": "1M", "rate": 4.60, "as_of": today.isoformat()},
-        {"tenor": "3M", "rate": 4.55, "as_of": today.isoformat()},
-        {"tenor": "6M", "rate": 4.45, "as_of": today.isoformat()},
-        {"tenor": "1Y", "rate": 4.30, "as_of": today.isoformat()},
-        {"tenor": "2Y", "rate": 4.22, "as_of": today.isoformat()},
-        {"tenor": "5Y", "rate": 4.18, "as_of": today.isoformat()},
-        {"tenor": "10Y", "rate": 4.35, "as_of": today.isoformat()},
-        {"tenor": "30Y", "rate": 4.55, "as_of": today.isoformat()},
-    ]
-    spread = round(4.35 - 4.22, 4)
+    # If demo mode is explicitly enabled, return labeled demo data
+    if demo_mode:
+        today = date.today()
+        demo_curve = [
+            {"tenor": "1M", "rate": 4.60, "as_of": today.isoformat()},
+            {"tenor": "3M", "rate": 4.55, "as_of": today.isoformat()},
+            {"tenor": "6M", "rate": 4.45, "as_of": today.isoformat()},
+            {"tenor": "1Y", "rate": 4.30, "as_of": today.isoformat()},
+            {"tenor": "2Y", "rate": 4.22, "as_of": today.isoformat()},
+            {"tenor": "5Y", "rate": 4.18, "as_of": today.isoformat()},
+            {"tenor": "10Y", "rate": 4.35, "as_of": today.isoformat()},
+            {"tenor": "30Y", "rate": 4.55, "as_of": today.isoformat()},
+        ]
+        spread = round(4.35 - 4.22, 4)
+        return {
+            "configured": False,
+            "message": "DEMO MODE: Showing illustrative yield curve",
+            "as_of": today.isoformat(),
+            "spread_10y_2y": spread,
+            "is_inverted": spread < 0,
+            "curve": demo_curve,
+            "curve_1m_ago": [],
+            "curve_1y_ago": [],
+        }
+
+    # Honest empty state: no fabricated numbers!
+    msg = "FRED key not configured" if not fred_configured else "FRED yield curve data not yet ingested"
     return {
         "configured": fred_configured,
-        "message": "FRED key not configured" if not fred_configured else "FRED data not yet ingested",
-        "as_of": today.isoformat(),
-        "spread_10y_2y": spread,
-        "is_inverted": spread < 0,
-        "curve": default_curve,
+        "message": msg,
+        "as_of": None,
+        "spread_10y_2y": None,
+        "is_inverted": False,
+        "curve": [],
+        "curve_1m_ago": [],
+        "curve_1y_ago": [],
     }
 
 
 @router.get("/fx", summary="Latest foreign exchange rates")
-async def get_fx_rates(session: SessionDep) -> list[dict[str, Any]]:
+async def get_fx_rates(session: SessionDep, request: Request) -> list[dict[str, Any]]:
+    settings = getattr(request.app.state, "settings", None)
+    demo_mode = getattr(settings, "demo_mode", False) if settings else False
+
     fx_stmt = (
         select(FxRate)
         .order_by(desc(FxRate.day))
@@ -220,7 +269,7 @@ async def get_fx_rates(session: SessionDep) -> list[dict[str, Any]]:
                 "date": r.day.isoformat(),
             }
 
-    if not rates:
+    if not rates and demo_mode:
         default_pairs = [
             ("EUR", "USD", 1.085),
             ("GBP", "USD", 1.295),

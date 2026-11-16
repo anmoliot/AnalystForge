@@ -6,6 +6,12 @@ metadata so Alembic and ``create_all`` see the full schema.
 
 from analystforge.api.models import reporting  # noqa: F401
 from analystforge.api.models.backtest import BacktestRun, BacktestTrade
+from analystforge.api.models.collaboration import (
+    AnalystNote,
+    ShareLink,
+    Watchlist,
+    WatchlistItem,
+)
 from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, TOTPSecret, Tenant, User
 from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
 from analystforge.api.models.market import (
@@ -21,12 +27,14 @@ from analystforge.api.models.portfolio import Portfolio, PortfolioTransaction
 from analystforge.api.models.rag import DocumentChunk, ResearchMessage, ResearchSession
 from analystforge.api.models.reporting import ReportArtifact
 from analystforge.api.models.research import Filing, FundamentalFact
-from analystforge.api.models.screener import AlertEvent, AlertRule, SavedScreen
+from analystforge.api.models.screener import AlertDelivery, AlertEvent, AlertRule, SavedScreen
 from analystforge.api.models.valuation import ValuationModel, ValuationVersion
 
 __all__ = [
+    "AlertDelivery",
     "AlertEvent",
     "AlertRule",
+    "AnalystNote",
     "ApiKey",
     "AuditLog",
     "BacktestRun",
@@ -53,10 +61,13 @@ __all__ = [
     "ResearchMessage",
     "ResearchSession",
     "SavedScreen",
+    "ShareLink",
     "TOTPSecret",
     "Tenant",
     "User",
     "ValuationModel",
     "ValuationVersion",
+    "Watchlist",
+    "WatchlistItem",
 ]
 

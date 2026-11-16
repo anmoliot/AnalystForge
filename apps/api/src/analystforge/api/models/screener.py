@@ -1,4 +1,4 @@
-"""Saved screens, alert rules and triggered alert persistence (Phase 8)."""
+"""Saved screens, alert rules and triggered alert persistence."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     JSON,
     Numeric,
     String,
@@ -36,6 +37,9 @@ class SavedScreen(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     filters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    schedule: Mapped[str | None] = mapped_column(String(32), nullable=True)  # daily, weekly, None
+    notify_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AlertRule(Base, TimestampMixin):
@@ -54,6 +58,12 @@ class AlertRule(Base, TimestampMixin):
     )  # PRICE_ABOVE, PRICE_BELOW, PE_ABOVE, PE_BELOW
     target_value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notification_channels: Mapped[list[str]] = mapped_column(
+        JSON, default=lambda: ["in_app"], nullable=False
+    )  # ["in_app", "email", "webhook"]
+    email_recipient: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     events: Mapped[list[AlertEvent]] = relationship(
         "AlertEvent", back_populates="rule", cascade="all, delete-orphan"
@@ -75,3 +85,23 @@ class AlertEvent(Base, TimestampMixin):
     )
 
     rule: Mapped[AlertRule] = relationship("AlertRule", back_populates="events")
+    deliveries: Mapped[list[AlertDelivery]] = relationship(
+        "AlertDelivery", back_populates="event", cascade="all, delete-orphan"
+    )
+
+
+class AlertDelivery(Base, TimestampMixin):
+    __tablename__ = "alert_deliveries"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("alert_events.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)  # in_app, email, webhook
+    status: Mapped[str] = mapped_column(String(32), default="delivered", nullable=False)  # delivered, failed, retrying
+    recipient: Mapped[str | None] = mapped_column(String(512), nullable=True)  # email address or webhook URL
+    attempts: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    event: Mapped[AlertEvent] = relationship("AlertEvent", back_populates="deliveries")

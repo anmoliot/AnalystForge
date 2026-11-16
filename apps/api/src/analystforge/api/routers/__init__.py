@@ -10,11 +10,14 @@ from analystforge.api.routers import (
     data,
     macro,
     meta,
+    notes,
     portfolio,
     reports,
     research,
     screener,
+    shares,
     valuation,
+    watchlists,
 )
 
 api_router = APIRouter()
@@ -27,6 +30,10 @@ api_router.include_router(backtest.router)
 api_router.include_router(screener.router)
 api_router.include_router(macro.router)
 api_router.include_router(alerts.router)
+api_router.include_router(watchlists.router)
+api_router.include_router(notes.router)
+api_router.include_router(shares.router)
+api_router.include_router(shares.public_share_router)
 api_router.include_router(research.router)
 api_router.include_router(reports.router)
 api_router.include_router(data.router)

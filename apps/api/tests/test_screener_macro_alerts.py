@@ -3,8 +3,61 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, timedelta
+from decimal import Decimal
 import httpx
 import pytest
+
+from analystforge.api.db import Database
+from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
+
+
+async def _seed_macro_data(db: Database) -> None:
+    async with db.session() as session:
+        today = date.today()
+        series_info = [
+            ("DGS10", "10-Year Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS2", "2-Year Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS1MO", "1-Month Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS3MO", "3-Month Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS6MO", "6-Month Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS1", "1-Year Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS5", "5-Year Treasury Constant Maturity Rate", "%", "Daily"),
+            ("DGS30", "30-Year Treasury Constant Maturity Rate", "%", "Daily"),
+            ("FEDFUNDS", "Federal Funds Effective Rate", "%", "Monthly"),
+            ("CPIAUCSL", "Consumer Price Index (CPI All Urban)", "Index", "Monthly"),
+            ("UNRATE", "Civilian Unemployment Rate", "%", "Monthly"),
+            ("GDPC1", "Real Gross Domestic Product", "Bil. Chn. 2017 $", "Quarterly"),
+        ]
+        rates = {
+            "DGS10": 4.35, "DGS2": 4.22, "DGS1MO": 4.60, "DGS3MO": 4.55,
+            "DGS6MO": 4.45, "DGS1": 4.30, "DGS5": 4.18, "DGS30": 4.55,
+            "FEDFUNDS": 4.83, "CPIAUCSL": 315.2, "UNRATE": 4.1, "GDPC1": 22850.0,
+        }
+        for code, title, units, freq in series_info:
+            s = await session.get(MacroSeries, code)
+            if not s:
+                s = MacroSeries(code=code, title=title, units=units, frequency=freq, provider="FRED")
+                session.add(s)
+                await session.flush()
+
+            val = Decimal(str(rates[code]))
+            # Seed today, 1 month ago, 1 year ago
+            for offset in (0, 30, 365):
+                obs = MacroObservation(
+                    series_code=code,
+                    day=today - timedelta(days=offset),
+                    value=val,
+                    provider="fred",
+                )
+                session.add(obs)
+
+        # FX pairs
+        fx_pairs = [("EUR", "USD", Decimal("1.085")), ("GBP", "USD", Decimal("1.295")), ("USD", "JPY", Decimal("154.2"))]
+        for b, q, r in fx_pairs:
+            session.add(FxRate(base=b, quote=q, day=today, rate=r, provider="ecb"))
+
+        await session.commit()
 
 
 @pytest.fixture
@@ -68,7 +121,9 @@ async def test_screener_execution_and_saved_preset(
 
 
 @pytest.mark.asyncio
-async def test_macro_dashboard_endpoints(client: httpx.AsyncClient) -> None:
+async def test_macro_dashboard_endpoints(client: httpx.AsyncClient, db: Database) -> None:
+    await _seed_macro_data(db)
+
     # 1. Economic series
     series_resp = await client.get("/api/v1/macro/series")
     assert series_resp.status_code == 200
