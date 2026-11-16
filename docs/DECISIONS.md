@@ -407,4 +407,32 @@ vendor errors.
 
 **Consequences:** Eliminates market data single-point-of-failure risks and enables reliable execution across international markets under active vendor rate limits or challenges.
 
+---
+
+## ADR-023: Worker Operations, Arq Cron Schedules, and Database Maintenance
+
+**Status:** Accepted (Work Package 9)  
+**Context:** The asynchronous worker (`apps/worker/src/analystforge/worker/main.py`) handles scheduled data ingest, alert evaluations, screen executions, and periodic maintenance. Background tasks require reliable Redis/arq scheduling, non-blocking import behavior, and database state rotation.
+
+**Decisions:**
+1. **Worker Cron Schedules:**
+   - Alerts evaluation (`check_alerts`): every 15 minutes (`minute={0, 15, 30, 45}`).
+   - Scheduled screens delivery (`check_scheduled_screens`): twice daily (`hour={8, 16}, minute=0`).
+   - Daily prices update (`update_prices`): weekday evenings at 22:37 UTC.
+   - Fundamentals update (`update_fundamentals`): daily at 03:17 UTC.
+   - News feed crawl (`update_news`): every 3 hours.
+   - Operational cleanup (`cleanup_database`): daily at 02:30 UTC.
+2. **Operational Database Cleanup:**
+   - Implemented `run_operational_cleanup` in `apps/api/src/analystforge/api/services/maintenance.py`.
+   - Deactivates expired `ShareLink` records (`expires_at < utcnow()`).
+   - Purges revoked and expired refresh tokens (`RefreshToken`) older than 7 days past expiry.
+   - Purges stale `ProviderHealthRecord` logs older than 30 days.
+3. **Resilient Worker Initialization:**
+   - `_redis_settings` provides fallback `RedisSettings()` when `REDIS_URL` is unset, preventing module import failure during testing.
+4. **Docker Compose Parity:**
+   - Synchronized environment variables in `docker-compose.yml` (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_MAX_INPUT_TOKENS`, `LLM_REQUESTS_PER_MINUTE`, and mailpit service on port 1025).
+
+**Consequences:** Automated long-term database stability, guaranteed token and share link lifecycle enforcement, and truthful operational parity across development and containerized environments.
+
+
 

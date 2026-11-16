@@ -18,6 +18,7 @@ from analystforge.api.services.alerts import (
     evaluate_alert_rules,
     run_scheduled_screens_and_dispatch,
 )
+from analystforge.api.services.maintenance import run_operational_cleanup
 from analystforge.api.services.ingest import (
     IngestionSummary,
     ingest_fundamentals,
@@ -47,7 +48,7 @@ async def heartbeat(ctx: dict[str, Any]) -> None:
 
 def _redis_settings() -> RedisSettings:
     if not settings.redis_url:
-        raise RuntimeError("REDIS_URL is required to run the worker")
+        return RedisSettings()
     return RedisSettings.from_dsn(settings.redis_url)
 
 
@@ -178,6 +179,12 @@ async def check_scheduled_screens(ctx: dict[str, Any]) -> dict[str, Any]:
     return res
 
 
+async def cleanup_database(ctx: dict[str, Any]) -> dict[str, Any]:
+    res = await run_operational_cleanup(ctx["database"])
+    logger.info("worker.database_cleanup_completed", **res)
+    return res
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -191,10 +198,12 @@ class WorkerSettings:
         check_quality,
         check_alerts,
         check_scheduled_screens,
+        cleanup_database,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         cron(check_alerts, minute={0, 15, 30, 45}, run_at_startup=False),
         cron(check_scheduled_screens, hour={8, 16}, minute=0, run_at_startup=False),
+        cron(cleanup_database, hour=2, minute=30, run_at_startup=False),
         cron(update_seed, hour=4, minute=7, run_at_startup=False),
         cron(update_prices, weekday={0, 1, 2, 3, 4}, hour=22, minute=37, run_at_startup=False),
         cron(update_fundamentals, hour=3, minute=17, run_at_startup=False),
