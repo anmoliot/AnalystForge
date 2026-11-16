@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
@@ -18,13 +19,23 @@ from analystforge.api.errors import DataUnavailableError, NotFoundError, Validat
 from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.api.models.portfolio import Portfolio, PortfolioTransaction
 from analystforge.api.services.portfolio import (
+    HoldingItem,
+    compute_black_litterman_portfolio,
+    compute_fama_french_exposure,
     compute_holdings_fifo,
     compute_portfolio_analytics,
+    compute_rolling_statistics,
+    compute_sector_attribution,
     enrich_holdings_with_prices,
     execute_stress_tests,
+    latest_prices,
+    load_price_histories,
     optimize_weights,
     parse_csv_transactions,
+    parse_transactions_file,
+    preview_transactions_file,
 )
+from analystforge.quant.rebalance import generate_rebalance_trades
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -77,6 +88,40 @@ class PortfolioDetailResponse(BaseModel):
     total_unrealized_pnl: float
     total_unrealized_pnl_pct: float
     holdings: list[HoldingResponse]
+
+
+class OptimizePortfolioRequest(BaseModel):
+    objective: str = "max_sharpe"
+    risk_free_rate: float = 0.04
+    min_weight: float = 0.0
+    max_weight: float = 1.0
+    initial_weights: list[float] | None = None
+    turnover_cap: float | None = None
+    asset_sectors: list[str] | None = None
+    sector_caps: dict[str, float] | None = None
+
+
+class RebalanceRequest(BaseModel):
+    target_weights: dict[str, float]
+    cash: float = 0.0
+    commission_bps: float = 10.0
+    allow_fractional: bool = True
+    min_trade_size: float = 1.0
+
+
+class BlackLittermanRequest(BaseModel):
+    market_weights: dict[str, float] | None = None
+    views: list[dict[str, Any]] | None = None
+    risk_aversion: float = 2.5
+    tau: float = 0.05
+    risk_free_rate: float = 0.04
+
+
+class AttributionRequest(BaseModel):
+    benchmark_groups: list[dict[str, Any]]
+    start: date | None = None
+    end: date | None = None
+    method: str = "bf"
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +288,8 @@ async def list_transactions(
     ]
 
 
-@router.post("/{portfolio_id}/import", summary="Import transactions from CSV with validation report")
-async def import_transactions(
+@router.post("/{portfolio_id}/import/preview", summary="Preview transactions file with column mapping suggestions")
+async def preview_transactions(
     portfolio_id: uuid.UUID,
     file: UploadFile = File(...),
     current_user: CurrentUser = None,
@@ -255,11 +300,39 @@ async def import_transactions(
         raise NotFoundError("Portfolio not found.")
 
     content = await file.read()
-    content_str = content.decode("utf-8", errors="replace")
+    return preview_transactions_file(content, file.filename or "transactions.csv")
 
-    valid_records, errors = parse_csv_transactions(content_str)
+
+@router.post("/{portfolio_id}/import", summary="Import transactions from CSV or Excel with column mapping & validation report")
+async def import_transactions(
+    portfolio_id: uuid.UUID,
+    file: UploadFile = File(...),
+    mapping: str | None = Form(None),
+    current_user: CurrentUser = None,
+    session: SessionDep = None,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    content = await file.read()
+    mapping_dict: dict[str, str] | None = None
+    if mapping:
+        try:
+            parsed = json.loads(mapping)
+            if isinstance(parsed, dict):
+                mapping_dict = {str(k): str(v) for k, v in parsed.items()}
+        except Exception:
+            mapping_dict = None
+
+    valid_records, errors = parse_transactions_file(
+        content,
+        file.filename or "transactions.csv",
+        mapping=mapping_dict,
+        default_currency=port.base_currency,
+    )
     if not valid_records and errors:
-        raise ValidationFailedError(f"CSV import failed: {errors[0]['error']}")
+        raise ValidationFailedError(f"Import failed: {errors[0]['error']}")
 
     for rec in valid_records:
         tx = PortfolioTransaction(
@@ -280,8 +353,42 @@ async def import_transactions(
         "status": "success",
         "imported_count": len(valid_records),
         "error_count": len(errors),
-        "errors": errors[:10],
+        "errors": errors[:50],
+        "validation_report": {
+            "filename": file.filename,
+            "total_rows": len(valid_records) + len(errors),
+            "valid_rows": len(valid_records),
+            "error_rows": len(errors),
+            "errors": errors,
+        },
     }
+
+
+@router.post("/{portfolio_id}/import/download-report", summary="Download validation report as CSV")
+async def download_import_report(
+    portfolio_id: uuid.UUID,
+    report_data: dict[str, Any],
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> Response:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    errors = report_data.get("errors", [])
+    csv_lines = ["row,status,ticker,error,details"]
+    for err in errors:
+        row_num = err.get("row", "")
+        msg = str(err.get("error", "")).replace('"', '""')
+        raw_data = str(err.get("data", {})).replace('"', '""')
+        csv_lines.append(f'{row_num},ERROR,"","{msg}","{raw_data}"')
+
+    content = "\n".join(csv_lines)
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="validation_report_{portfolio_id}.csv"'},
+    )
 
 
 @router.get("/{portfolio_id}/risk", summary="Quantitative risk analytics suite (VaR, CVaR, Sharpe, Drawdown)")
@@ -351,12 +458,13 @@ async def get_portfolio_risk(
     return compute_portfolio_analytics(port_returns)
 
 
-@router.post("/{portfolio_id}/optimize", summary="Mean-variance & Max Sharpe portfolio optimizer")
+@router.post("/{portfolio_id}/optimize", summary="Mean-variance, Max Sharpe, and Risk Parity optimizer")
 async def optimize_portfolio_endpoint(
     portfolio_id: uuid.UUID,
     current_user: CurrentUser,
     session: SessionDep,
-    objective: Annotated[str, Query(pattern="^(max_sharpe|min_variance)$")] = "max_sharpe",
+    objective: Annotated[str, Query(pattern="^(max_sharpe|min_variance|risk_parity)$")] = "max_sharpe",
+    body: OptimizePortfolioRequest | None = None,
 ) -> dict[str, Any]:
     port = await session.get(Portfolio, portfolio_id)
     if not port or port.tenant_id != current_user.tenant_id:
@@ -406,7 +514,290 @@ async def optimize_portfolio_endpoint(
     clean_dict = {t: v[-min_len:] for t, v in daily_dict.items()}
     prices_df = pd.DataFrame(clean_dict)
     ret_df = prices_df.pct_change().dropna()
-    return optimize_weights(ret_df, objective=objective)
+
+    req_obj = body.objective if body else objective
+    rf = body.risk_free_rate if body else 0.04
+    min_w = body.min_weight if body else 0.0
+    max_w = body.max_weight if body else 1.0
+    turnover_cap = body.turnover_cap if body else None
+    initial_weights = body.initial_weights if body else None
+    asset_sectors = body.asset_sectors if body else None
+    sector_caps = body.sector_caps if body else None
+
+    return optimize_weights(
+        ret_df,
+        objective=req_obj,
+        risk_free_rate=rf,
+        min_weight=min_w,
+        max_weight=max_w,
+        initial_weights=initial_weights,
+        turnover_cap=turnover_cap,
+        asset_sectors=asset_sectors,
+        sector_caps=sector_caps,
+    )
+
+
+@router.post("/{portfolio_id}/rebalance", summary="Generate rebalance trade orders for target weights")
+async def rebalance_portfolio_endpoint(
+    portfolio_id: uuid.UUID,
+    body: RebalanceRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    tx_stmt = select(PortfolioTransaction).where(PortfolioTransaction.portfolio_id == port.id)
+    txs = (await session.execute(tx_stmt)).scalars().all()
+    holdings = compute_holdings_fifo(txs)
+
+    all_tickers = sorted(set(list(body.target_weights.keys()) + [h.ticker for h in holdings]))
+    prices_map = await latest_prices(session, all_tickers)
+    missing = [t for t in all_tickers if t not in prices_map]
+    if missing:
+        raise DataUnavailableError(f"Missing current price for tickers: {', '.join(missing)}")
+
+    current_shares = {h.ticker: h.shares for h in holdings}
+    for t in all_tickers:
+        if t not in current_shares:
+            current_shares[t] = Decimal("0")
+
+    prices_only = {t: info[0] for t, info in prices_map.items()}
+
+    plan = generate_rebalance_trades(
+        current_shares=current_shares,
+        prices=prices_only,
+        target_weights=body.target_weights,
+        cash=Decimal(str(body.cash)),
+        commission_bps=Decimal(str(body.commission_bps)),
+        allow_fractional=body.allow_fractional,
+        min_trade_size=Decimal(str(body.min_trade_size)),
+    )
+
+    return {
+        "portfolio_id": str(port.id),
+        "portfolio_value": float(plan.portfolio_value),
+        "starting_cash": float(plan.starting_cash),
+        "ending_cash": float(plan.ending_cash),
+        "turnover": float(plan.turnover),
+        "total_traded_value": float(plan.total_traded_value),
+        "total_estimated_commissions": float(plan.total_estimated_commissions),
+        "orders": [
+            {
+                "ticker": o.ticker,
+                "action": str(o.action),
+                "current_shares": float(o.current_shares),
+                "target_shares": float(o.target_shares),
+                "delta_shares": float(o.delta_shares),
+                "price": float(o.price),
+                "current_value": float(o.current_value),
+                "target_value": float(o.target_value),
+                "trade_value": float(o.trade_value),
+                "current_weight": float(o.current_weight),
+                "target_weight": float(o.target_weight),
+                "weight_delta": float(o.weight_delta),
+                "estimated_commission": float(o.estimated_commission),
+            }
+            for o in plan.orders
+        ],
+    }
+
+
+@router.get("/{portfolio_id}/factors", summary="Fama-French factor exposure regression")
+async def get_fama_french_exposure(
+    portfolio_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    tx_stmt = select(PortfolioTransaction).where(PortfolioTransaction.portfolio_id == port.id)
+    txs = (await session.execute(tx_stmt)).scalars().all()
+    holdings = compute_holdings_fifo(txs)
+    tickers = [h.ticker for h in holdings]
+    bench_ticker = port.benchmark_ticker or "SPY"
+    all_needed = list(set(tickers + [bench_ticker]))
+
+    inst_stmt = select(Instrument).where(Instrument.ticker.in_(all_needed))
+    instruments = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+
+    daily_prices: dict[str, pd.Series] = {}
+    for ticker, inst_id in instruments.items():
+        bar_stmt = (
+            select(PriceBar.ts, PriceBar.close)
+            .where(PriceBar.instrument_id == inst_id, PriceBar.interval == "1d")
+            .order_by(PriceBar.ts)
+        )
+        bar_rows = (await session.execute(bar_stmt)).fetchall()
+        if len(bar_rows) >= 5:
+            dates = [r[0] for r in bar_rows]
+            prices = [float(r[1]) for r in bar_rows]
+            daily_prices[ticker] = pd.Series(prices, index=pd.to_datetime(dates))
+
+    if not daily_prices or any(t not in daily_prices for t in tickers):
+        raise DataUnavailableError("Insufficient historical price bars to compute factor regression.")
+
+    holding_prices = {t: daily_prices[t] for t in tickers}
+    df_prices = pd.DataFrame(holding_prices).dropna()
+    ret_df = df_prices.pct_change().dropna()
+    weights = [float(h.total_cost) for h in holdings if h.ticker in ret_df.columns]
+    tot_w = sum(weights) or 1.0
+    w_vec = np.array([w / tot_w for w in weights])
+    port_returns = ret_df.dot(w_vec)
+
+    bench_series = daily_prices.get(bench_ticker)
+    if bench_series is not None:
+        bench_returns = bench_series.pct_change().dropna().reindex(port_returns.index).fillna(0.0)
+    else:
+        bench_returns = port_returns.copy()
+
+    return compute_fama_french_exposure(port_returns, bench_returns)
+
+
+@router.get("/{portfolio_id}/rolling", summary="Rolling risk and performance metrics")
+async def get_rolling_metrics(
+    portfolio_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: SessionDep,
+    window: Annotated[int, Query(ge=5, le=500)] = 20,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    tx_stmt = select(PortfolioTransaction).where(PortfolioTransaction.portfolio_id == port.id)
+    txs = (await session.execute(tx_stmt)).scalars().all()
+    holdings = compute_holdings_fifo(txs)
+    tickers = [h.ticker for h in holdings]
+    bench_ticker = port.benchmark_ticker or "SPY"
+    all_needed = list(set(tickers + [bench_ticker]))
+
+    inst_stmt = select(Instrument).where(Instrument.ticker.in_(all_needed))
+    instruments = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+
+    daily_prices: dict[str, pd.Series] = {}
+    for ticker, inst_id in instruments.items():
+        bar_stmt = (
+            select(PriceBar.ts, PriceBar.close)
+            .where(PriceBar.instrument_id == inst_id, PriceBar.interval == "1d")
+            .order_by(PriceBar.ts)
+        )
+        bar_rows = (await session.execute(bar_stmt)).fetchall()
+        if len(bar_rows) >= 5:
+            dates = [r[0] for r in bar_rows]
+            prices = [float(r[1]) for r in bar_rows]
+            daily_prices[ticker] = pd.Series(prices, index=pd.to_datetime(dates))
+
+    if not daily_prices or any(t not in daily_prices for t in tickers):
+        raise DataUnavailableError("Insufficient historical price bars to compute rolling statistics.")
+
+    holding_prices = {t: daily_prices[t] for t in tickers}
+    df_prices = pd.DataFrame(holding_prices).dropna()
+    ret_df = df_prices.pct_change().dropna()
+    weights = [float(h.total_cost) for h in holdings if h.ticker in ret_df.columns]
+    tot_w = sum(weights) or 1.0
+    w_vec = np.array([w / tot_w for w in weights])
+    port_returns = ret_df.dot(w_vec)
+
+    bench_series = daily_prices.get(bench_ticker)
+    if bench_series is not None:
+        bench_returns = bench_series.pct_change().dropna().reindex(port_returns.index).fillna(0.0)
+    else:
+        bench_returns = port_returns.copy()
+
+    return compute_rolling_statistics(port_returns, bench_returns, window=window)
+
+
+@router.post("/{portfolio_id}/black-litterman", summary="Black-Litterman expected returns and optimal allocation")
+async def black_litterman_endpoint(
+    portfolio_id: uuid.UUID,
+    body: BlackLittermanRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    tx_stmt = select(PortfolioTransaction).where(PortfolioTransaction.portfolio_id == port.id)
+    txs = (await session.execute(tx_stmt)).scalars().all()
+    holdings = compute_holdings_fifo(txs)
+    tickers = [h.ticker for h in holdings]
+
+    if len(tickers) < 2:
+        raise ValidationFailedError("Black-Litterman model requires at least 2 distinct asset holdings.")
+
+    inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
+    inst_map = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+
+    daily_dict: dict[str, list[float]] = {}
+    for ticker in tickers:
+        inst_id = inst_map.get(ticker)
+        if inst_id:
+            bar_stmt = (
+                select(PriceBar.close)
+                .where(PriceBar.instrument_id == inst_id)
+                .order_by(PriceBar.ts)
+            )
+            rows = (await session.execute(bar_stmt)).scalars().all()
+            if rows:
+                daily_dict[ticker] = [float(r) for r in rows]
+
+    min_len = min((len(v) for v in daily_dict.values()), default=0)
+    if min_len < 10 or len(daily_dict) < len(tickers):
+        raise DataUnavailableError("Insufficient price history for Black-Litterman optimization.")
+
+    clean_dict = {t: v[-min_len:] for t, v in daily_dict.items()}
+    prices_df = pd.DataFrame(clean_dict)
+    ret_df = prices_df.pct_change().dropna()
+
+    return compute_black_litterman_portfolio(
+        ret_df,
+        market_weights=body.market_weights,
+        views=body.views,
+        risk_aversion=body.risk_aversion,
+        tau=body.tau,
+        risk_free_rate=body.risk_free_rate,
+    )
+
+
+@router.post("/{portfolio_id}/attribution", summary="Brinson-Fachler sector performance attribution")
+async def sector_attribution_endpoint(
+    portfolio_id: uuid.UUID,
+    body: AttributionRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    port = await session.get(Portfolio, portfolio_id)
+    if not port or port.tenant_id != current_user.tenant_id:
+        raise NotFoundError("Portfolio not found.")
+
+    tx_stmt = select(PortfolioTransaction).where(PortfolioTransaction.portfolio_id == port.id)
+    txs = (await session.execute(tx_stmt)).scalars().all()
+    holdings = compute_holdings_fifo(txs)
+    enriched = await enrich_holdings_with_prices(session, holdings)
+
+    start = body.start or (date.today() - timedelta(days=30))
+    end = body.end or date.today()
+    tickers = [h.ticker for h in holdings]
+    inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
+    inst_rows = (await session.execute(inst_stmt)).scalars().all()
+    sectors = {inst.ticker: inst.sector or "Unclassified" for inst in inst_rows}
+    histories, missing, _ = await load_price_histories(
+        session, tickers, base_currency=port.base_currency, start=start, end=end
+    )
+    return compute_sector_attribution(
+        enriched,
+        histories,
+        sectors=sectors,
+        benchmark_groups=body.benchmark_groups,
+        start=start,
+        end=end,
+        method=body.method,
+    )
 
 
 @router.post("/{portfolio_id}/stress-test", summary="Historical macro stress shock scenarios")

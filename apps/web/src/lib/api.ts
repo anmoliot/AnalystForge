@@ -387,4 +387,65 @@ export interface PortfolioTx {
   notes?: string | null;
 }
 
+export interface FactorRegressionResponse {
+  alpha_annualized: number;
+  alpha_periodic: number;
+  betas: Record<string, number>;
+  t_stats: Record<string, number>;
+  p_values: Record<string, number>;
+  std_errors: Record<string, number>;
+  r_squared: number;
+  r_squared_adj: number;
+  residual_volatility: number;
+  observations: number;
+  factor_names: string[];
+}
+
+export interface RollingStatsResponse {
+  window: number;
+  dates: string[];
+  rolling_volatility: number[];
+  rolling_sharpe: Array<number | null>;
+  rolling_beta: Array<number | null>;
+  rolling_tracking_error: number[];
+  rolling_information_ratio: Array<number | null>;
+  rolling_max_drawdown: number[];
+}
+
+export interface RebalanceOrder {
+  ticker: string;
+  action: "BUY" | "SELL" | "HOLD";
+  current_shares: number;
+  target_shares: number;
+  delta_shares: number;
+  price: number;
+  current_value: number;
+  target_value: number;
+  trade_value: number;
+  current_weight: number;
+  target_weight: number;
+  weight_delta: number;
+  estimated_commission: number;
+}
+
+export interface RebalancePlanResponse {
+  portfolio_id: string;
+  portfolio_value: number;
+  starting_cash: number;
+  ending_cash: number;
+  turnover: number;
+  total_traded_value: number;
+  total_estimated_commissions: number;
+  orders: RebalanceOrder[];
+}
+
+export interface ImportPreviewResponse {
+  filename: string;
+  headers: string[];
+  preview_rows: Array<Record<string, unknown>>;
+  suggested_mapping: Record<string, string>;
+  missing_required: string[];
+  canonical_columns: Array<{ key: string; label: string; required: boolean }>;
+}
+
 

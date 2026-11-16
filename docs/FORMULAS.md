@@ -85,3 +85,27 @@ $$\text{Allocation Effect}: A_i = (w_{p,i} - w_{b,i}) \times (R_{b,i} - R_b)$$
 $$\text{Selection Effect}: S_i = w_{b,i} \times (R_{p,i} - R_{b,i})$$
 $$\text{Interaction Effect}: I_i = (w_{p,i} - w_{b,i}) \times (R_{p,i} - R_{b,i})$$
 $$\text{Total Active Return} = \sum_i (A_i + S_i + I_i)$$
+
+### 2.5 Fama-French Multi-Factor Regression
+$$R_{p,t} - R_{f,t} = \alpha + \beta_{\text{Mkt}} (R_{m,t} - R_{f,t}) + \beta_{\text{SMB}} \text{SMB}_t + \beta_{\text{HML}} \text{HML}_t + \epsilon_t$$
+$$\text{Annualized Alpha}: \alpha_{\text{ann}} = \alpha_{\text{daily}} \times 252$$
+$$\text{Residual Volatility}: \sigma_{\epsilon,\text{ann}} = \sqrt{\frac{1}{N - k} \sum \epsilon_t^2} \times \sqrt{252}$$
+
+### 2.6 Rolling Statistics
+$$\sigma_{\text{roll}, t} = \sqrt{\frac{1}{W - 1} \sum_{s=t-W+1}^t (R_s - \bar{R})^2} \times \sqrt{252}$$
+$$\beta_{\text{roll}, t} = \frac{\text{Cov}_{W}(R_p, R_b)}{\text{Var}_{W}(R_b)}$$
+$$\text{MDD}_{\text{roll}, t} = \min_{s \in [t-W+1, t]} \left( \frac{P_s - \max_{\tau \le s} P_{\tau}}{\max_{\tau \le s} P_{\tau}} \right)$$
+
+### 2.7 Portfolio Rebalancing & Turnover
+$$\text{Target Dollars}_i = \text{Portfolio Value} \times w_i^{\text{target}}$$
+$$\text{Target Shares}_i = \frac{\text{Target Dollars}_i}{P_i}$$
+$$\text{Delta Shares}_i = \text{Target Shares}_i - \text{Current Shares}_i$$
+$$\text{Turnover (One-Way)} = \frac{1}{2} \sum_{i=1}^N |w_i^{\text{target}} - w_i^{\text{current}}|$$
+$$\text{Turnover Constraint}: \frac{1}{2} \|w - w_{\text{initial}}\|_1 \le \text{Turnover Cap}$$
+$$\text{Sector Caps}: \sum_{i \in \text{Sector}_k} w_i \le \text{Cap}_k$$
+
+### 2.8 Black-Litterman Asset Allocation
+$$\text{Prior Equilibrium Returns}: \Pi = \delta \Sigma w_{\text{mkt}}$$
+$$\text{Posterior Returns}: E[R] = \left[ (\tau \Sigma)^{-1} + P^T \Omega^{-1} P \right]^{-1} \left[ (\tau \Sigma)^{-1} \Pi + P^T \Omega^{-1} Q \right]$$
+$$\text{Posterior Covariance}: \Sigma_{\text{post}} = \Sigma + \left[ (\tau \Sigma)^{-1} + P^T \Omega^{-1} P \right]^{-1}$$
+$$\text{Optimal Weights}: w^* = (\delta \Sigma_{\text{post}})^{-1} E[R]$$

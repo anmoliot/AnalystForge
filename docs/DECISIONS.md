@@ -263,3 +263,22 @@ vendor errors.
 7. Maintain offline CI compatibility using deterministic fake fixtures, while offering marked `pytest -m live` suite for real key verification.
 
 **Consequences:** Seamless Groq and FRED support with zero key exposure, strict rate limit compliance, and zero test breakage across offline CI environments.
+
+## ADR-017 — Portfolio Suite Completeness, Optimization Constraints, and Import Wizard
+
+**Status:** Accepted
+
+**Context:** Portfolio analytics lacked systematic multi-factor regression (Fama-French 3/5 factor), moving-window statistical tracking (rolling volatility, Sharpe, beta, tracking error, information ratio, drawdown), Black-Litterman subjective view incorporation, trade rebalancing with transaction cost and turnover accounting, and robust column-mapping transaction import wizards with downloadable validation reports.
+
+**Decision:**
+1. Implement pure quantitative functions under `packages/quant`:
+   - `factors.py`: OLS regression for Fama-French multi-factor exposure models with t-statistics, p-values, R², and annualized Jensen's alpha.
+   - `rolling.py`: Rolling window analytics for volatility, Sharpe, beta, tracking error, information ratio, and peak-to-trough drawdowns.
+   - `rebalance.py`: Rebalance trade list generator computing current vs target shares, cash delta, one-way turnover, and estimated broker commissions.
+   - `black_litterman.py`: Implied equilibrium prior returns combined with investor views via pick matrix $P$ and view uncertainty matrix $\Omega$ (using He-Litterman proportional formulation), yielding posterior expected returns and covariance.
+   - `optimization.py`: Extend quadratic CLARABEL and SLSQP programs to accept convex L1 turnover caps ($0.5 \|w - w_0\|_1 \le \text{cap}$) and linear sector caps.
+2. Build 2-step CSV/Excel import wizard supporting `.csv`, `.xlsx`, and `.xls` with header inspection, preview rows, interactive column mapping, and downloadable CSV validation reports.
+3. Expose dedicated API endpoints under `/portfolios/{id}` for `/factors`, `/rolling`, `/rebalance`, `/black-litterman`, `/attribution`, and `/import/preview`.
+4. Surface interactive tabs in frontend `Portfolios.tsx` for rebalance order execution, factor exposures, and rolling metrics.
+
+**Consequences:** The platform provides institutional-grade portfolio risk, rebalance execution, and multi-factor analytics while preserving zero-fabricated-data guarantees.

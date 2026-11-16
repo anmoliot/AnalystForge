@@ -9,8 +9,9 @@ a guessed portfolio.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import cvxpy as cp
 import numpy as np
@@ -170,6 +171,10 @@ def _solve_quadratic(
     means: FloatArray,
     min_weight: float,
     max_weight: float,
+    initial_weights: FloatArray | None = None,
+    turnover_cap: float | None = None,
+    sector_matrix: FloatArray | None = None,
+    sector_caps: FloatArray | None = None,
     solver: str = cp.CLARABEL,
 ) -> tuple[FloatArray, str]:
     asset_count = cov.shape[0]
@@ -181,6 +186,15 @@ def _solve_quadratic(
     ]
     if target_return is not None:
         constraints.append(cp.sum(cp.multiply(means, weights)) >= target_return)
+
+    if turnover_cap is not None and initial_weights is not None:
+        if turnover_cap < 0.0:
+            raise OptimizationError("turnover_cap cannot be negative")
+        constraints.append(0.5 * cp.norm(weights - initial_weights, 1) <= turnover_cap)
+
+    if sector_matrix is not None and sector_caps is not None:
+        constraints.append(sector_matrix @ weights <= sector_caps)
+
     problem = cp.Problem(
         cp.Minimize(cp.quad_form(weights, cov, assume_PSD=True)),
         constraints,
@@ -195,6 +209,32 @@ def _solve_quadratic(
     return np.asarray(weights.value, dtype=np.float64).ravel(), str(problem.status)
 
 
+def _build_sector_constraints(
+    asset_count: int,
+    asset_sectors: Sequence[str] | None,
+    sector_caps: Mapping[str, float] | None,
+) -> tuple[FloatArray | None, FloatArray | None]:
+    if sector_caps is None or asset_sectors is None:
+        return None, None
+    if len(asset_sectors) != asset_count:
+        raise OptimizationError("asset_sectors length must match number of assets")
+
+    sectors = list(sector_caps.keys())
+    matrix = np.zeros((len(sectors), asset_count), dtype=np.float64)
+    caps = np.zeros(len(sectors), dtype=np.float64)
+
+    for row_idx, sector in enumerate(sectors):
+        cap_val = float(sector_caps[sector])
+        if cap_val < 0.0 or cap_val > 1.0 + _WEIGHT_SUM_TOLERANCE:
+            raise OptimizationError(f"sector cap for '{sector}' must be between 0 and 1")
+        caps[row_idx] = cap_val
+        for col_idx, a_sec in enumerate(asset_sectors):
+            if a_sec == sector:
+                matrix[row_idx, col_idx] = 1.0
+
+    return matrix, caps
+
+
 def _min_variance_from_arrays(
     means: FloatArray,
     cov: FloatArray,
@@ -202,6 +242,10 @@ def _min_variance_from_arrays(
     min_weight: float,
     max_weight: float,
     risk_free_rate: float,
+    initial_weights: FloatArray | None = None,
+    turnover_cap: float | None = None,
+    sector_matrix: FloatArray | None = None,
+    sector_caps: FloatArray | None = None,
 ) -> OptimizationResult:
     _validate_bounds(means.size, min_weight, max_weight)
     weights, status = _solve_quadratic(
@@ -210,6 +254,10 @@ def _min_variance_from_arrays(
         means=means,
         min_weight=min_weight,
         max_weight=max_weight,
+        initial_weights=initial_weights,
+        turnover_cap=turnover_cap,
+        sector_matrix=sector_matrix,
+        sector_caps=sector_caps,
     )
     return _result_from_weights(
         weights,
@@ -228,15 +276,33 @@ def min_variance(
     min_weight: float = 0.0,
     max_weight: float = 1.0,
     risk_free_rate: float = 0.0,
+    initial_weights: Sequence[float] | None = None,
+    turnover_cap: float | None = None,
+    asset_sectors: Sequence[str] | None = None,
+    sector_caps: Mapping[str, float] | None = None,
 ) -> OptimizationResult:
-    """Minimum-variance portfolio subject to full investment and weight bounds."""
+    """Minimum-variance portfolio subject to full investment, weight bounds, and optional turnover/sector caps."""
     means, cov = _validate_inputs(expected_returns, covariance)
+    init_w: FloatArray | None = None
+    if initial_weights is not None:
+        init_w = np.asarray(initial_weights, dtype=np.float64).ravel()
+        if init_w.size != means.size:
+            raise OptimizationError("initial_weights must match number of assets")
+        if not np.all(np.isfinite(init_w)):
+            raise OptimizationError("initial_weights must be finite")
+
+    s_matrix, s_caps = _build_sector_constraints(means.size, asset_sectors, sector_caps)
+
     return _min_variance_from_arrays(
         means,
         cov,
         min_weight=min_weight,
         max_weight=max_weight,
         risk_free_rate=risk_free_rate,
+        initial_weights=init_w,
+        turnover_cap=turnover_cap,
+        sector_matrix=s_matrix,
+        sector_caps=s_caps,
     )
 
 
@@ -247,18 +313,37 @@ def max_sharpe(
     risk_free_rate: float = 0.0,
     min_weight: float = 0.0,
     max_weight: float = 1.0,
+    initial_weights: Sequence[float] | None = None,
+    turnover_cap: float | None = None,
+    asset_sectors: Sequence[str] | None = None,
+    sector_caps: Mapping[str, float] | None = None,
 ) -> OptimizationResult:
     """Maximum-Sharpe portfolio using SLSQP from a feasible starting point."""
     means, cov = _validate_inputs(expected_returns, covariance)
     _validate_bounds(means.size, min_weight, max_weight)
     if not np.isfinite(risk_free_rate):
         raise OptimizationError("risk_free_rate must be finite")
+
+    init_w: FloatArray | None = None
+    if initial_weights is not None:
+        init_w = np.asarray(initial_weights, dtype=np.float64).ravel()
+        if init_w.size != means.size:
+            raise OptimizationError("initial_weights must match number of assets")
+        if not np.all(np.isfinite(init_w)):
+            raise OptimizationError("initial_weights must be finite")
+
+    s_matrix, s_caps = _build_sector_constraints(means.size, asset_sectors, sector_caps)
+
     start = _min_variance_from_arrays(
         means,
         cov,
         min_weight=min_weight,
         max_weight=max_weight,
         risk_free_rate=risk_free_rate,
+        initial_weights=init_w,
+        turnover_cap=turnover_cap,
+        sector_matrix=s_matrix,
+        sector_caps=s_caps,
     )
     initial = np.asarray(start.weights, dtype=np.float64)
 
@@ -269,12 +354,32 @@ def max_sharpe(
             return 1e12
         return -(expected - risk_free_rate) / float(np.sqrt(variance))
 
+    constraints: list[dict[str, Any]] = [
+        {"type": "eq", "fun": lambda weights: float(np.sum(weights) - 1.0)},
+    ]
+
+    if turnover_cap is not None and init_w is not None:
+        constraints.append(
+            {
+                "type": "ineq",
+                "fun": lambda weights: turnover_cap - 0.5 * float(np.sum(np.abs(weights - init_w))),
+            }
+        )
+
+    if s_matrix is not None and s_caps is not None:
+        constraints.append(
+            {
+                "type": "ineq",
+                "fun": lambda weights: s_caps - (s_matrix @ weights),
+            }
+        )
+
     result = scipy.optimize.minimize(
         negative_sharpe,
         initial,
         method="SLSQP",
         bounds=[(min_weight, max_weight)] * means.size,
-        constraints=({"type": "eq", "fun": lambda weights: float(np.sum(weights) - 1.0)},),
+        constraints=constraints,
         options={"ftol": 1e-12, "maxiter": 1000},
     )
     if not result.success or result.x is None:
