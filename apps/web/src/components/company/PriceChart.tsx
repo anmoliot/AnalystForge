@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { createChart, IChartApi, ISeriesApi, CandlestickData, ColorType } from "lightweight-charts";
+import { createChart, ColorType } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, CandlestickData } from "lightweight-charts";
 
 export interface PriceChartProps {
   /**

@@ -24,7 +24,7 @@ export interface ReportItem {
 
 export interface ReportDetail extends ReportItem {
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export default function Reports() {

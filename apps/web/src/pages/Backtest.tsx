@@ -53,7 +53,7 @@ export interface BacktestRunDetail {
   total_slippage_paid?: number;
   total_borrow_cost_paid?: number;
   survivorship_warning?: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   equity_curve: Array<{ date: string; equity: number; benchmark: number }>;
   trades: Array<{
     id: string;
@@ -97,13 +97,13 @@ interface SweepResult {
   ticker: string;
   strategy_name: string;
   param1_name: string;
-  param1_values: any[];
+  param1_values: unknown[];
   param2_name: string;
-  param2_values: any[];
+  param2_values: unknown[];
   sharpe_matrix: (number | null)[][];
   return_matrix: number[][];
   drawdown_matrix: number[][];
-  best_params: Record<string, any>;
+  best_params: Record<string, unknown>;
   best_sharpe: number | null;
   best_return: number;
   best_drawdown: number;
@@ -165,13 +165,13 @@ def generate_signals(df):
   // Recent runs
   const { data: recentRuns = [], refetch: refetchRuns } = useQuery({
     queryKey: ["backtest-runs"],
-    queryFn: () => api.get<Array<any>>("/api/v1/backtests"),
+    queryFn: () => api.get<Array<Record<string, unknown>>>("/api/v1/backtests"),
   });
 
   // Standard Backtest Mutation
   const runMutation = useMutation({
     mutationFn: () => {
-      const params: Record<string, any> = {};
+      const params: Record<string, unknown> = {};
       if (strategy === "SMA_CROSSOVER") {
         params.fast_period = fastPeriod;
         params.slow_period = slowPeriod;

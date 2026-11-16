@@ -196,6 +196,7 @@ export default function Valuation() {
         { method_id: "precedents", label: "Precedent Deals", category: "Transactions", low: 175.0, base: 200.0, high: 235.0 },
       ],
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleScenarioChange = (s: "base" | "bull" | "bear") => {
