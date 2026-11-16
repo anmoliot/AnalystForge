@@ -1,4 +1,4 @@
-"""Research document chunks, sessions, and messages (Phase 9 Grounded AI & RAG)."""
+"""Research document chunks, sessions, messages, and call audit logs (Phase 9 Grounded AI & RAG)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from analystforge.api.db import Base
@@ -64,13 +64,36 @@ class DocumentChunk(Base):
     instrument_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("instruments.id", ondelete="CASCADE"), index=True
     )
-    source_type: Mapped[str] = mapped_column(String(32), nullable=False)  # "FILING" | "NEWS" | "NOTES"
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False)  # "FILING" | "NEWS" | "FACT" | "NOTES"
     source_id: Mapped[str] = mapped_column(String(128), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     section: Mapped[str | None] = mapped_column(String(128))
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ResearchCallLog(Base):
+    __tablename__ = "research_call_logs"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("research_sessions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    tool_calls_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    citations_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    refusal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

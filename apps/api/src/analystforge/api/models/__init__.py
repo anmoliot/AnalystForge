@@ -24,7 +24,12 @@ from analystforge.api.models.market import (
 from analystforge.api.models.news import NewsArticle, NewsArticleInstrument
 from analystforge.api.models.ops import JobRun, ProviderHealthRecord
 from analystforge.api.models.portfolio import Portfolio, PortfolioTransaction
-from analystforge.api.models.rag import DocumentChunk, ResearchMessage, ResearchSession
+from analystforge.api.models.rag import (
+    DocumentChunk,
+    ResearchCallLog,
+    ResearchMessage,
+    ResearchSession,
+)
 from analystforge.api.models.reporting import ReportArtifact
 from analystforge.api.models.research import Filing, FundamentalFact
 from analystforge.api.models.screener import AlertDelivery, AlertEvent, AlertRule, SavedScreen
@@ -58,6 +63,7 @@ __all__ = [
     "ProviderHealthRecord",
     "RefreshToken",
     "ReportArtifact",
+    "ResearchCallLog",
     "ResearchMessage",
     "ResearchSession",
     "SavedScreen",

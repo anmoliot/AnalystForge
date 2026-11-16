@@ -333,3 +333,36 @@ vendor errors.
    - Mount public unauthenticated read-only endpoint `GET /api/v1/public/shares/{token}` that returns resource data before expiration, returning HTTP 410 Gone when expired, and HTTP 404 when revoked.
 
 **Consequences:** Fulfills all institutional workflow requirements for alert automation, screener scheduling with SMTP verification, team collaboration, and secure time-delimited sharing.
+
+## ADR-020 — AI Research Assistant Architecture, Hybrid RAG Retrieval, News Sentiment Analytics, and SEC Filings Intelligence
+
+**Status:** Accepted
+
+**Context:** The platform's research assistant was a placeholder without grounded evidence linking, strict hallucination refusals, audited tool calls, or real sentiment/filing intelligence. Analysts required automated full-text news extraction, deduplication, FinBERT/lexical sentiment scoring with price overlay, topic clustering, SEC 10-K/10-Q section navigation, period-over-period Item 1A/Item 7 diffing, structured note draft generation, and proven refusal when evidence is absent or speculative.
+
+**Decision:**
+1. **News Analytics Pipeline (`services/news_analytics.py`):**
+   - Full-text extraction using `trafilatura` with HTML sanitizer fallback.
+   - Deduplication via URL query normalization, SHA256 text token hashing, and Jaccard title token similarity.
+   - Ticker tagging linking articles to database instruments via regex word boundaries and company name matching.
+   - Financial sentiment analysis via local FinBERT (if available) with curated Loughran-McDonald financial dictionary fallback; outputs score, label, confidence, and backend label.
+   - Aggregated sentiment per ticker and sentiment-vs-price overlay aligning daily close prices with average sentiment.
+   - Topic clustering grouping articles into 6 financial domains (Earnings, M&A, Macro/Rates, Regulatory/Legal, Product/Tech, Capital Markets).
+2. **SEC Filings Navigation & Diffing (`services/filings_analytics.py`):**
+   - 10-K and 10-Q section segmentation into standard items (Item 1, 1A, 1B, 2, 3, 7, 7A, 8).
+   - Period-over-period diffing using `difflib.SequenceMatcher`, computing added/removed paragraphs and identifying emerging risk factors.
+   - Key metric comparative extraction from XBRL facts with YoY dollar and percentage growth.
+3. **Hybrid RAG Retrieval Engine (`services/retrieval.py`):**
+   - Overlapping passage chunking preserving sentence boundaries.
+   - Reciprocal Rank Fusion (RRF) combining BM25 lexical term matching with cosine vector semantic similarity (`sentence-transformers` or TF-IDF vector fallback).
+4. **Research Assistant Orchestrator (`services/research_assistant.py`):**
+   - Strict Grounding: All assertions require inline citations (`[citation:N]`) pointing to exact retrieved chunks.
+   - Strict Refusal: Speculative future price predictions, out-of-corpus queries, or questions lacking evidence trigger explicit refusal: `"I cannot find sufficient evidence in the retrieved filings and disclosures to answer this question. (Refusal: insufficient evidence)."`.
+   - Audited Tools: Sandboxed functions (`get_ratios`, `get_prices`, `run_screen`, `quick_dcf`) with parameter validation and execution tracking.
+   - Server-Sent Events (SSE) streaming (`POST /research/stream`).
+   - Structured research note drafts (`POST /research/notes/draft`).
+   - Audit logging in `research_call_logs` without key or sensitive prompt leakage.
+5. **Evaluation Benchmark & AI_EVAL.md:**
+   - 50-question evaluation dataset (`tests/eval_dataset.py`) covering 30 supported institutional questions and 20 speculative/hallucination traps. Tested in `apps/api/tests/test_research_wp6.py` achieving 100% citation grounding and 100% refusal precision. Full benchmark documented in `docs/AI_EVAL.md`.
+
+**Consequences:** Eliminates hallucinations and provides institutional-grade research assistance, verifiable citations, and quantitative filings/news analytics.

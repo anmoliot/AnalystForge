@@ -611,7 +611,7 @@ class DeterministicFakeLLMProvider(LLMProvider):
 
     name = "fake"
 
-    def __init__(self, canned_response: str = "This is a deterministic AI response based on retrieved facts.") -> None:
+    def __init__(self, canned_response: str | dict[str, str] = "This is a deterministic AI response based on retrieved facts.") -> None:
         self.canned_response = canned_response
         self.call_history: list[list[dict[str, Any]]] = []
 
@@ -637,10 +637,27 @@ class DeterministicFakeLLMProvider(LLMProvider):
         raw_msgs = [m.to_dict() if isinstance(m, ChatMessage) else m for m in messages]
         self.call_history.append(raw_msgs)
 
+        # Resolve content
+        last_msg = str(raw_msgs[-1].get("content", "")) if raw_msgs else ""
+        all_text = " ".join(str(m.get("content", "")) for m in raw_msgs)
+
         if response_format and response_format.get("type") == "json_object":
-            content = json.dumps({"analysis": "deterministic analysis", "confidence": 0.95})
+            content = json.dumps({
+                "snapshot": "Deterministic corporate snapshot based on indexed disclosures.",
+                "thesis": "Market leadership substantiated by robust cash generation.",
+                "risks": "Regulatory, supply chain, and macroeconomic interest rate shifts.",
+                "valuation_summary": "In line with sector trading multiples and DCF fair value estimates.",
+                "confidence": 0.95,
+            })
+        elif isinstance(self.canned_response, dict):
+            matched = None
+            for k, v in self.canned_response.items():
+                if k.lower() in all_text.lower():
+                    matched = v
+                    break
+            content = matched or "[citation:1] Deterministic research synthesis based on retrieved disclosures."
         else:
-            content = self.canned_response
+            content = str(self.canned_response)
 
         tool_calls: list[ToolCall] = []
         if tools:
@@ -666,6 +683,10 @@ class DeterministicFakeLLMProvider(LLMProvider):
         temperature: float = 0.0,
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
-        words = self.canned_response.split(" ")
+        if isinstance(self.canned_response, dict):
+            text = list(self.canned_response.values())[0] if self.canned_response else "Deterministic response"
+        else:
+            text = str(self.canned_response)
+        words = text.split(" ")
         for word in words:
             yield word + " "

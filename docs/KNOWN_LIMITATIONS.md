@@ -11,8 +11,9 @@ This file is maintained honestly throughout delivery. Items are removed only whe
 - GNU Make is absent on the build host; Makefile targets mirror the commands that were run natively.
 - Local verification uses PostgreSQL 18.3; deployments pin PostgreSQL 16 + TimescaleDB. SQL is kept
   compatible with both. Hypertable-specific behaviour is not exercised locally.
-- Redis is absent locally; development uses an in-process cache and inline job execution. Queue and
-  rate-limit behaviour backed by Redis is covered by unit tests with fakeredis and by CI services.
+- Redis is available locally (`redis-cli ping` returns PONG) and is used for caching and job queues.
+  In-process/inline execution is used when Redis is unavailable; Redis-backed rate-limit and queue
+  behaviour is covered by unit tests and CI services.
 - Paid provider adapters (Alpha Vantage, Twelve Data, Polygon, FMP, NewsAPI) cannot be verified
   against live endpoints without keys. They are tested against recorded fixtures and are disabled
   unless configured.

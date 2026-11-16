@@ -1634,15 +1634,14 @@ def compute_fama_french_exposure(
     if len(portfolio_returns) < 5:
         raise DataUnavailableError("Insufficient returns history for factor regression; need at least 5 periods.")
 
-    # If factors_df is not supplied, use benchmark as Market factor and estimate empirical proxies
+    # If factors_df is not supplied, use the benchmark as Mkt-RF and neutral
+    # zero proxies for SMB/HML.  Zeros are a deterministic modeling assumption
+    # (no size/value factor data available), never random or fabricated data.
     if factors_df is None:
         rf_periodic = risk_free_rate / 252.0
         mkt_rf = benchmark_returns - rf_periodic
-        # Proxy SMB and HML for multi-factor regression demonstration if Ken French table is unseeded
-        # In a real environment with populated factors, factors_df is passed directly
-        rng = np.random.default_rng(seed=42)
-        smb = pd.Series(rng.normal(0.0001, 0.004, size=len(portfolio_returns)), index=portfolio_returns.index)
-        hml = pd.Series(rng.normal(0.0000, 0.003, size=len(portfolio_returns)), index=portfolio_returns.index)
+        smb = pd.Series(0.0, index=portfolio_returns.index)
+        hml = pd.Series(0.0, index=portfolio_returns.index)
         factors_df = pd.DataFrame({"Mkt-RF": mkt_rf, "SMB": smb, "HML": hml})
 
     reg = fama_french_regression(

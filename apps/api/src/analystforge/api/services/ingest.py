@@ -30,7 +30,7 @@ from analystforge.api.models.macro import (
     MacroSeries as MacroSeriesRow,
 )
 from analystforge.api.models.market import CorporateAction, Instrument, PriceBar
-from analystforge.api.models.news import NewsArticle
+from analystforge.api.models.news import NewsArticle, NewsArticleInstrument
 from analystforge.api.models.ops import JobRun, ProviderHealthRecord
 from analystforge.api.models.research import (
     Filing as FilingRow,
@@ -799,6 +799,13 @@ async def ingest_news(
     *,
     limit: int = 100,
 ) -> IngestionSummary:
+    from analystforge.api.services.news_analytics import (
+        analyze_sentiment,
+        classify_topics,
+        extract_article_content,
+        tag_instruments_in_text,
+    )
+
     summary = IngestionSummary(job="news")
     now = datetime.now(UTC)
     async with database.session() as session:
@@ -806,23 +813,66 @@ async def ingest_news(
             result, trace = await registry.call(Capability.NEWS, "fetch_articles", limit=limit)
             await _record_trace(session, trace)
             articles: list[NewsItem] = result
-            rows = [
-                {
+
+            # Load instruments for ticker tagging
+            instruments = (await session.execute(select(Instrument))).scalars().all()
+
+            rows = []
+            article_tag_mappings: list[tuple[str, list[uuid.UUID]]] = []
+
+            for article in articles:
+                full_text = f"{article.title}. {article.summary or ''}"
+                extracted_content = extract_article_content(article.summary or article.title)
+                sentiment = analyze_sentiment(full_text)
+                topics = classify_topics(full_text)
+                tagged_inst_ids = tag_instruments_in_text(full_text, instruments)
+
+                rows.append({
                     "url": article.url,
                     "source": article.source,
                     "title": article.title,
                     "summary": article.summary,
-                    "content": None,
+                    "content": extracted_content,
                     "language": article.language,
                     "published_at": article.published_at,
                     "fetched_at": now,
-                }
-                for article in articles
-            ]
+                    "sentiment_score": sentiment["score"],
+                    "sentiment_label": sentiment["label"],
+                    "sentiment_confidence": sentiment["confidence"],
+                    "sentiment_backend": sentiment["backend"],
+                    "topics": topics,
+                })
+                article_tag_mappings.append((article.url, tagged_inst_ids))
+
             summary.add(
                 "articles", await _upsert(_dialect(database), session, NewsArticle, rows, ("url",))
             )
             summary.items_ok = len(rows)
+
+            # Link tagged instruments in news_article_instruments
+            all_db_articles = (
+                await session.execute(
+                    select(NewsArticle).where(NewsArticle.url.in_([r["url"] for r in rows]))
+                )
+            ).scalars().all()
+            db_art_by_url = {a.url: a.id for a in all_db_articles}
+
+            tag_rows = []
+            for url, inst_ids in article_tag_mappings:
+                art_id = db_art_by_url.get(url)
+                if art_id:
+                    for i_id in inst_ids:
+                        tag_rows.append({"article_id": art_id, "instrument_id": i_id})
+
+            if tag_rows:
+                await _upsert(
+                    _dialect(database),
+                    session,
+                    NewsArticleInstrument,
+                    tag_rows,
+                    ("article_id", "instrument_id"),
+                )
+
             for provider in registry.providers:
                 failures = list(getattr(provider, "last_errors", []))
                 if failures:
