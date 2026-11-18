@@ -32,3 +32,11 @@ export function exercise(data) {
 export const thresholds = {
   http_req_duration: ["p(95)<500"], http_req_failed: ["rate<0.01"], checks: ["rate>0.99"],
 };
+
+export function handleSummary(data) {
+  // k6 setup data contains the temporary bearer token. Export aggregate metrics only.
+  return {
+    [__ENV.K6_SUMMARY_PATH || "smoke.json"]: JSON.stringify({ metrics: data.metrics, root_group: data.root_group }, null, 2),
+    stdout: "Load summary saved with aggregate metrics only.\n",
+  };
+}

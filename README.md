@@ -27,12 +27,13 @@ placeholder data in analysis paths; missing data is shown as unavailable with th
 Prerequisites: Docker Engine 24+ with Compose v2.
 
 ```bash
-git clone <your-repo-url> analystforge
+git clone https://github.com/anmoliot/AnalystForge.git analystforge
 cd analystforge
-make up
+python scripts/gen_env.py
+docker compose up -d --build
 ```
 
-`make up` generates a `.env` with random secrets on first run, builds the images and starts
+The environment generator writes random development secrets on first run. Compose builds the images and starts
 PostgreSQL 16 + TimescaleDB, Redis, the API, the worker, the web app and Nginx.
 
 | Service | URL |
@@ -79,15 +80,41 @@ instrument and date.
 Prerequisites: Python 3.12, Node 22, [uv](https://docs.astral.sh/uv/), PostgreSQL 16+
 (TimescaleDB optional locally), Redis optional.
 
-```bash
-make env                     # generate .env with random secrets
-make bootstrap               # uv sync + npm install
-createdb analystforge        # or use the connection string in .env
-make migrate                 # apply Alembic migrations
-make dev-api                 # API on :8000
-make dev-web                 # Vite on :5173 (proxies /api to :8000)
-make seed && make ingest-local   # load real reference and market data
-```
+~~~bash
+python scripts/gen_env.py
+uv sync --all-packages
+cd apps/web
+npm ci
+cd ../..
+# Set DATABASE_URL in .env to an existing PostgreSQL database.
+uv run alembic -c apps/api/alembic.ini upgrade head
+uv run uvicorn analystforge.api.main:app --host 127.0.0.1 --port 8000
+# In another terminal
+cd apps/web
+npm run dev
+~~~
+
+Version 0.1.0 is defined in the root pyproject.toml. Package/web mirrors are checked by
+scripts/check_version.py. See docs/KNOWN_LIMITATIONS.md before deployment. The migration chain
+does not yet create every later model table on a fresh PostgreSQL database.
+
+## Recorded reviewer walkthrough
+
+This walkthrough creates an ephemeral SQLite database, loads recorded historical AAPL bars and
+SEC facts, and starts the ordinary API and Vite servers. Login, company statements, user-assumption
+DCF, portfolio/risk, backtest, screener, research and PDF download are verified.
+Screenshots are historical test evidence. Run from apps/web after installing workspace dependencies.
+
+~~~bash
+npx playwright install chromium
+npm run test:e2e
+~~~
+
+The test API runs on 127.0.0.1:8765 and Vite on 127.0.0.1:4174 during the run.
+TEST_DATABASE_URL can select a disposable PostgreSQL database whose name ends in _test.
+Redis is optional. Live ingestion uses uv run analystforge-data seed followed by
+uv run analystforge-data ingest-all against your configured database. DEMO_MODE remains false.
+See tests/e2e/fixtures/README.md for provenance.
 
 ## Tests and quality gates
 
@@ -95,7 +122,7 @@ make seed && make ingest-local   # load real reference and market data
 make test                    # Python + web unit tests
 make lint                    # ruff, mypy (quant), eslint, tsc
 make coverage                # coverage report; packages/quant is gated at 95%
-make e2e                     # Playwright against a running stack
+make e2e                     # Playwright starts isolated API and Vite
 ```
 
 ## Repository layout
@@ -114,6 +141,12 @@ tests                 End-to-end, load and contract tests
 
 ## Documentation
 
+- [API reference](docs/API.md)
+- [User guide](docs/USER_GUIDE.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Security](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Decisions (ADRs)](docs/DECISIONS.md)
 - [Known limitations](docs/KNOWN_LIMITATIONS.md)

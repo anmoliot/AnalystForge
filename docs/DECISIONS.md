@@ -371,7 +371,7 @@ vendor errors.
 
 ## ADR-021: Multi-Format Reporting Engine (PDF, PPTX, Live-Formula Excel, Email Delivery, Python SDK)
 
-**Status:** Accepted (Work Package 7)  
+**Status:** Accepted (Work Package 7)
 **Context:** Institutional analysts require tear sheets and research reports exported in presentation formats (widescreen PowerPoint `pptx`), publication quality PDFs (ReportLab), and interactive financial models with live spreadsheet formulas (Excel `xlsx` via `xlsxwriter`), alongside structured formats (Markdown, CSV, JSON). Reports must be dispatchable over SMTP email with attachments, unsupported formats strictly rejected with HTTP 422, and the Python SDK (`analystforge-py`) expanded with full reporting and analytics methods.
 
 **Decisions:**
@@ -388,7 +388,7 @@ vendor errors.
 
 ## ADR-022: Secondary Price Providers (Alpha Vantage & Twelve Data) and Multi-Source Failover Pipeline
 
-**Status:** Accepted (Work Package 8)  
+**Status:** Accepted (Work Package 8)
 **Context:** The primary price source (Yahoo Finance) is unauthenticated and Stooq frequently presents anti-bot browser challenges to programmatic HTTP clients. A robust institutional platform requires secondary, key-authenticated market data adapters with automated failover and health tracking.
 
 **Decisions:**
@@ -411,7 +411,7 @@ vendor errors.
 
 ## ADR-023: Worker Operations, Arq Cron Schedules, and Database Maintenance
 
-**Status:** Accepted (Work Package 9)  
+**Status:** Accepted (Work Package 9)
 **Context:** The asynchronous worker (`apps/worker/src/analystforge/worker/main.py`) handles scheduled data ingest, alert evaluations, screen executions, and periodic maintenance. Background tasks require reliable Redis/arq scheduling, non-blocking import behavior, and database state rotation.
 
 **Decisions:**
@@ -459,3 +459,24 @@ Three exact history fingerprints are excluded from Gitleaks because they are pub
 constants. Current signing keys are generated and the mock settings key was removed.
 Published history was retained. The web CSP allows same-origin scripts and inline styles used by
 React layouts/charts. Theme initialization is external. HSTS depends on the actual HTTPS scheme.
+
+## WP11 release and status decisions
+
+The root pyproject.toml version is authoritative. Distribution, API and web manifests remain
+mirrors validated by scripts/check_version.py. Tag publication reruns CI and validates the tag
+against that authority before publishing versioned API/web images and changelog release notes.
+The workflow uses only GitHub-provided tokens. Local checks establish workflow structure and
+version/schema generation. A tag push, registry publication and hosted CI execution remain pending.
+
+Historical phase reports retain their old evidence and are explicitly superseded by current work
+packages. Current status distinguishes executed local gates from runtime/CI checks needing another
+environment. Docker absence and missing provider/model configuration remain visible.
+
+NSE and BSE seed entries use distinct provider-native tickers for each listing to avoid ambiguous
+company routes. Only verified Yahoo mappings are configured. No Indian price/fundamental values
+were fabricated. New ingestion requires a separate provider run.
+
+The k6 summary exporter saves metrics and check groups only. Its setup data contains a disposable
+bearer token and is excluded. An accidental local test-token artifact was removed from the two
+unpublished commits before release preparation. Published history was unchanged, and a fresh
+full-history Gitleaks scan passed. Future CI smoke exports use this aggregate-only serializer.

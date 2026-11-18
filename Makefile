@@ -56,7 +56,7 @@ test-python: ## Run Python tests
 test-web: ## Run frontend tests
 	cd apps/web && npm test -- --run
 
-e2e: ## Run Playwright end-to-end tests (stack must be up)
+e2e: ## Run Playwright end-to-end tests (starts isolated API and Vite)
 	cd apps/web && npm run test:e2e
 
 lint: lint-python lint-web ## Lint everything

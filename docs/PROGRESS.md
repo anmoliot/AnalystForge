@@ -17,27 +17,31 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 | **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | **Complete** | Implemented secondary key-authenticated market data adapters: `TwelveDataPricesProvider` (`twelvedata.py`) and `AlphaVantagePricesProvider` (`alphavantage.py`); registered in `_PRICE_ADAPTERS` and `ProviderRegistry`; configured graceful degradation when keys are absent via `is_configured()`; tested multi-tier failover in `packages/providers/tests/test_secondary_prices_wp8.py` (Yahoo 500 error → Stooq browser challenge → Twelve Data ok with full `FailoverTrace` attempt recording); documented in `.env.example`; verified Continental European coverage with Deutsche Börse XETRA. All 75 provider tests pass. |
 | **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | **Complete** | Validated arq worker job suite in `apps/worker/src/analystforge/worker/main.py` with cron schedules for alerts (every 15 min), scheduled screens (twice daily), macro, prices, and news updates; implemented operational maintenance and database cleanup in `apps/api/src/analystforge/api/services/maintenance.py` (`run_operational_cleanup` deactivating expired `ShareLink`s, purging revoked `RefreshToken`s, and pruning stale health logs); updated `docker-compose.yml` with Groq LLM variables, mailpit SMTP catcher, and secondary providers; unit tests in `apps/worker/tests/test_worker_wp9.py` pass. |
 | **WP10** | Hardening & audits (Security, accessibility, performance) | Implemented, local gates passed | See WP10 executed evidence below. Container/Trivy and CI PostgreSQL browser execution remain unverified. |
-| **WP11** | Truthful documentation & release | Planned | |
+| **WP11** | Truthful documentation & release | Documentation implemented, publication unverified | OpenAPI generation and version checker pass. User guide, API, runbook, security/contributor docs and changelog added. Release workflow YAML parses. Tag publication remains unexecuted. |
 
 ---
 
-## Phase Audit Baseline
+## Historical phase records
+
+These entries preserve prior delivery reports. Their counts and operational claims are historical.
+The work-package table and executed WP10 evidence govern current verification. Phase 11 and 12
+are superseded by WP10 and WP11 and do not independently establish completion.
 
 | Phase | Scope | Status | Evidence |
 |---|---|---|---|
-| 0 | Foundations: repo, tooling, Docker, config, health, CI | Complete | 17 backend tests, 7 web tests, ruff/format/mypy clean, Alembic applied to PostgreSQL 18 and `alembic check` reports no drift, live `/health` `/ready` `/api/v1/meta` `/docs` `/metrics`, `npm run build`, dark/light screenshots in `docs/screenshots/` |
-| 1 | Data layer, migrations, providers | Complete | Migration `2b389a02be3a` applied; 50 instruments across LSE/NASDAQ/XETRA with 126,324 daily bars (2016-11-14 → 2026-11-13), 539,942 XBRL facts and 800 filings for 20 US companies, 9 FRED series/8,464 observations, 12,800 FX rates/5 pairs and 60 news articles loaded live; failover test plus live CLI run (stooq browser-challenge error → yahoo ok, persisted in `provider_health`); quality report 0 errors/15 vendor-anomaly warnings; 90 backend + 9 web tests pass; ruff/format/mypy/eslint/tsc clean; dark/light screenshots captured |
-| 2 | Quant core library | Complete | 149 unit and property tests pass across attribution, DCF, DuPont, multiples, optimization, ratios, returns, risk, scoring, statements and WACC; 95% line coverage on `packages/quant`; pure Decimal arithmetic with banker's rounding for currency |
-| 3 | Auth, tenancy, RBAC, audit | Complete | Argon2 password hashing; PyJWT access tokens (15m) + rotating refresh tokens with family tracking and token reuse attack detection; TOTP 2FA with Fernet-encrypted secret storage; API key generation and authentication (`af_...`); RBAC hierarchy (ADMIN, PORTFOLIO_MANAGER, ANALYST, READ_ONLY); immutable audit log on all mutating actions; migration `0003_auth_tables.py`; 6 auth tests pass |
-| 4 | Company and financials APIs/UI | Complete | Endpoints for company profile, OHLCV candlestick price history, normalized statements (income/balance/cashflow), 50+ ratios suite with formula and input traceability, sector peers, and SEC filings; interactive web research terminal with candlestick charting, statements tables, ratio calculation modal, peer comparisons; 8 backend tests (`test_company_api.py`) and 2 web tests (`Companies.test.tsx`) pass; production build verified |
-| 5 | Valuation workbench | Complete | Driver-based DCF (FCFF), WACC derivation, 2D sensitivity grid (WACC × terminal growth), Monte Carlo distribution (P10/P50/P90), versioned model audit trail with scenario tagging (base/bull/bear), and Excel workbook generation with live recalculating formulas (`xlsxwriter`); 5 backend tests (`test_valuation_api.py`) and 1 web test (`Valuation.test.tsx`) pass |
-| 6 | Portfolio and risk | Complete | Migration 0005 applied; FIFO/LIFO/WAC multi-currency lot accounting engine with realized/unrealized P&L and dividend tracking; TWR, XIRR, CAGR, and drawdown calculations; historical/parametric VaR and CVaR (expected shortfall) risk engine; beta-scaled historical crisis stress testing (GFC, COVID-19, 2022 rate shock, 2018 Q4 sell-off); quadratic programming mean-variance & max Sharpe portfolio optimization with efficient frontier generation; CSV transaction import parser; interactive Institutional Portfolio Workbench UI (Holdings, Ledger, Risk & Crisis Shocks, MPT Optimizer); Auth/Login screen; 4 backend portfolio tests + 54 API tests pass + 14 web tests pass; tsc & production build clean |
-| 7 | Backtesting | Complete | Models `BacktestRun`, `BacktestTrade`; quantitative execution engine supporting SMA Crossover, RSI Momentum, Mean Reversion, and Buy-and-Hold strategies with transaction-level trade tracking, equity curve calculation, CAGR, Sharpe ratio, Max Drawdown, and Win Rate metrics; interactive Backtest Lab UI (`Backtest.tsx`) with Recharts equity curve vs benchmark and trade log; 2 backend API tests (`test_backtest_api.py`) and 1 web test (`Backtest.test.tsx`) pass |
-| 8 | Screener, macro, alerts | Complete | Models `SavedScreen`, `AlertRule`, `AlertEvent`, `FxRate`, `MacroSeries`, `MacroObservation`; multi-metric screener API with preset filters and CSV export; FRED yield curve visualizer with 10Y-2Y spread inversion monitor and FX board; real-time alert threshold engine with in-app/email/webhook dispatch; UIs for `Screener.tsx`, `Macro.tsx`, `Alerts.tsx`; 3 backend API tests (`test_screener_macro_alerts.py`) and 3 web tests pass |
-| 9 | News, filings, AI | Complete | Models `ResearchSession`, `ResearchMessage`, `DocumentChunk`; Grounded AI & RAG system indexing SEC EDGAR filings, XBRL facts, and financial news with passage-level citation provenance; research workspace UI (`Research.tsx`) with grounded conversation and source audit badges; 2 backend API tests (`test_research_api.py`) and 1 web test (`Research.test.tsx`) pass |
-| 10 | Reporting, SDK, public API | Complete | Model `ReportArtifact`; institutional research tearsheet, DCF valuation summary, portfolio factor risk memo, and backtest report generator with streaming download; typed Python SDK (`analystforge-sdk`) client in `packages/sdk-python`; Reports archive and preview UI (`Reports.tsx`); 1 backend API test (`test_reports_api.py`), 4 SDK tests (`test_sdk.py`), and 1 web test (`Reports.test.tsx`) pass |
-| 11 | Hardening and performance | Complete | Full regression test suite passing 100%: 149 quant unit/property tests, 59 data provider tests, 4 Python SDK tests, 62 backend API tests, and 20 frontend web tests; production build (`tsc -b && vite build`) compiles cleanly with 0 errors |
-| 12 | Documentation and release | Complete | Full API specifications, models, and workflows documented; system state and progress verified across all modules; code packaged and committed |
+| 0 | Foundations: repo, tooling, Docker, config, health, CI | Historical implementation record | 17 backend tests, 7 web tests, ruff/format/mypy clean, Alembic applied to PostgreSQL 18 and `alembic check` reports no drift, live `/health` `/ready` `/api/v1/meta` `/docs` `/metrics`, `npm run build`, dark/light screenshots in `docs/screenshots/` |
+| 1 | Data layer, migrations, providers | Historical implementation record | Migration `2b389a02be3a` applied; 50 instruments across LSE/NASDAQ/XETRA with 126,324 daily bars (2016-11-14 → 2026-11-13), 539,942 XBRL facts and 800 filings for 20 US companies, 9 FRED series/8,464 observations, 12,800 FX rates/5 pairs and 60 news articles loaded live; failover test plus live CLI run (stooq browser-challenge error → yahoo ok, persisted in `provider_health`); quality report 0 errors/15 vendor-anomaly warnings; 90 backend + 9 web tests pass; ruff/format/mypy/eslint/tsc clean; dark/light screenshots captured |
+| 2 | Quant core library | Historical implementation record | 149 unit and property tests pass across attribution, DCF, DuPont, multiples, optimization, ratios, returns, risk, scoring, statements and WACC; 95% line coverage on `packages/quant`; pure Decimal arithmetic with banker's rounding for currency |
+| 3 | Auth, tenancy, RBAC, audit | Historical implementation record | Argon2 password hashing; PyJWT access tokens (15m) + rotating refresh tokens with family tracking and token reuse attack detection; TOTP 2FA with Fernet-encrypted secret storage; API key generation and authentication (`af_...`); RBAC hierarchy (ADMIN, PORTFOLIO_MANAGER, ANALYST, READ_ONLY); immutable audit log on all mutating actions; migration `0003_auth_tables.py`; 6 auth tests pass |
+| 4 | Company and financials APIs/UI | Historical implementation record | Endpoints for company profile, OHLCV candlestick price history, normalized statements (income/balance/cashflow), 50+ ratios suite with formula and input traceability, sector peers, and SEC filings; interactive web research terminal with candlestick charting, statements tables, ratio calculation modal, peer comparisons; 8 backend tests (`test_company_api.py`) and 2 web tests (`Companies.test.tsx`) pass; production build verified |
+| 5 | Valuation workbench | Historical implementation record | Driver-based DCF (FCFF), WACC derivation, 2D sensitivity grid (WACC × terminal growth), Monte Carlo distribution (P10/P50/P90), versioned model audit trail with scenario tagging (base/bull/bear), and Excel workbook generation with live recalculating formulas (`xlsxwriter`); 5 backend tests (`test_valuation_api.py`) and 1 web test (`Valuation.test.tsx`) pass |
+| 6 | Portfolio and risk | Historical implementation record | Migration 0005 applied; FIFO/LIFO/WAC multi-currency lot accounting engine with realized/unrealized P&L and dividend tracking; TWR, XIRR, CAGR, and drawdown calculations; historical/parametric VaR and CVaR (expected shortfall) risk engine; beta-scaled historical crisis stress testing (GFC, COVID-19, 2022 rate shock, 2018 Q4 sell-off); quadratic programming mean-variance & max Sharpe portfolio optimization with efficient frontier generation; CSV transaction import parser; interactive Institutional Portfolio Workbench UI (Holdings, Ledger, Risk & Crisis Shocks, MPT Optimizer); Auth/Login screen; 4 backend portfolio tests + 54 API tests pass + 14 web tests pass; tsc & production build clean |
+| 7 | Backtesting | Historical implementation record | Models `BacktestRun`, `BacktestTrade`; quantitative execution engine supporting SMA Crossover, RSI Momentum, Mean Reversion, and Buy-and-Hold strategies with transaction-level trade tracking, equity curve calculation, CAGR, Sharpe ratio, Max Drawdown, and Win Rate metrics; interactive Backtest Lab UI (`Backtest.tsx`) with Recharts equity curve vs benchmark and trade log; 2 backend API tests (`test_backtest_api.py`) and 1 web test (`Backtest.test.tsx`) pass |
+| 8 | Screener, macro, alerts | Historical implementation record | Models `SavedScreen`, `AlertRule`, `AlertEvent`, `FxRate`, `MacroSeries`, `MacroObservation`; multi-metric screener API with preset filters and CSV export; FRED yield curve visualizer with 10Y-2Y spread inversion monitor and FX board; real-time alert threshold engine with in-app/email/webhook dispatch; UIs for `Screener.tsx`, `Macro.tsx`, `Alerts.tsx`; 3 backend API tests (`test_screener_macro_alerts.py`) and 3 web tests pass |
+| 9 | News, filings, AI | Historical implementation record | Models `ResearchSession`, `ResearchMessage`, `DocumentChunk`; Grounded AI & RAG system indexing SEC EDGAR filings, XBRL facts, and financial news with passage-level citation provenance; research workspace UI (`Research.tsx`) with grounded conversation and source audit badges; 2 backend API tests (`test_research_api.py`) and 1 web test (`Research.test.tsx`) pass |
+| 10 | Reporting, SDK, public API | Historical implementation record | Model `ReportArtifact`; institutional research tearsheet, DCF valuation summary, portfolio factor risk memo, and backtest report generator with streaming download; typed Python SDK (`analystforge-sdk`) client in `packages/sdk-python`; Reports archive and preview UI (`Reports.tsx`); 1 backend API test (`test_reports_api.py`), 4 SDK tests (`test_sdk.py`), and 1 web test (`Reports.test.tsx`) pass |
+| 11 | Hardening and performance | Superseded by WP10 | Full regression test suite passing 100%: 149 quant unit/property tests, 59 data provider tests, 4 Python SDK tests, 62 backend API tests, and 20 frontend web tests; production build (`tsc -b && vite build`) compiles cleanly with 0 errors |
+| 12 | Documentation and release | Superseded by WP11 | Full API specifications, models, and workflows documented; system state and progress verified across all modules; code packaged and committed |
 
 ## Decisions log (short form; rationale in DECISIONS.md)
 
@@ -54,7 +58,7 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 
 ## Environment notes
 
-- Build host: Linux, Python 3.12/3.13, Node 22, PostgreSQL 18 running locally, Redis available.
+- Current build host is Windows 11, Python 3.12 and Node 22. Earlier environment records are historical.
 - uv 0.13.x installed; `pip install uv` stalled on this host and was abandoned.
 - Docker Engine, GNU Make are not installed on the build host. Native verification uses
   PostgreSQL directly plus `uv run pytest` and `npm test` (the `make test` equivalents). Docker
@@ -98,3 +102,29 @@ The test server raises API quotas to measure endpoint performance.
 
 Docker Engine and GNU Make are absent. Docker/Nginx runtime behaviour and Trivy execution
 remain unverified for this change. CI jobs are configured and their success is not claimed.
+
+## WP11 and review follow-up evidence on 2026-11-18
+
+- scripts/generate_api_docs.py ran successfully and generated the endpoint table from OpenAPI.
+- scripts/check_version.py passed with authoritative version 0.1.0.
+- Both workflow YAML files parsed and contained job definitions. Hosted actions and publication
+  require a tag/runner and have not been executed here.
+- README, user guide, API reference, runbook, SECURITY.md, CONTRIBUTING.md and CHANGELOG.md
+  exist. A local-link check found zero missing targets.
+- Python lint/format/mypy passed. Frontend typecheck, lint, 20 tests and production build passed.
+  The final Playwright workflow passed after expanding the seed, retaining 18 dark/light screenshots.
+- The final exact full pytest coverage command passed again on the expanded tree with 481 passed,
+  three explicit skips, and 95.52% quant branch coverage. The same pytest skips are listed above.
+- The corrected aggregate-only k6 exporter passed with 45 checks, zero failed requests and p95
+  96.26 ms. The saved summary excludes setup_data and bearer tokens. Full-history Gitleaks passed
+  across the 24 current commits before the documentation commit.
+- Seven data API tests passed for 54 listings across five exchanges. NSE/BSE each contain Reliance
+  and TCS, with INR currency, explicit Yahoo mappings and idempotent seeding assertions.
+- Explicit live tests for authenticated FRED/Groq skipped without keys. A separate public CSV
+  FRED DGS10 request returned 23 observations. No credentials were printed.
+- Local Mailpit ports 1025/8025 had no listener. transformers and torch are absent. Mailpit delivery
+  and FinBERT loading remain unverified. SMTP tests use an in-process test server.
+
+The hardening commit is 787d8be. Indian reference coverage is committed separately as 2246bb0.
+Current phase records defer to these work-package statuses and cannot independently establish
+hardening or release completion.

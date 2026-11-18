@@ -59,6 +59,11 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict (quant)
         run: uv run mypy packages/quant/src
+      - name: Version and generated API reference
+        run: |
+          uv run python scripts/check_version.py
+          uv run python scripts/generate_api_docs.py
+          git diff --exit-code -- docs/API.md
       - name: Migrations
         run: uv run alembic -c apps/api/alembic.ini upgrade head
       - name: Pytest
@@ -197,7 +202,7 @@ jobs:
           api_pid=$!
           trap 'kill "$api_pid"' EXIT
           curl --retry 60 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:8765/health
-          k6 run --summary-export=smoke.json tests/load/smoke.js
+          k6 run tests/load/smoke.js
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
