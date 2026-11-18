@@ -799,6 +799,8 @@ async def ingest_news(
     registry: ProviderRegistry,
     *,
     limit: int = 100,
+    finbert_enabled: bool = False,
+    finbert_model: str = "ProsusAI/finbert",
 ) -> IngestionSummary:
     from analystforge.api.services.news_analytics import (
         analyze_sentiment,
@@ -824,7 +826,9 @@ async def ingest_news(
             for article in articles:
                 full_text = f"{article.title}. {article.summary or ''}"
                 extracted_content = extract_article_content(article.summary or article.title)
-                sentiment = analyze_sentiment(full_text)
+                sentiment = analyze_sentiment(
+                    full_text, finbert_enabled=finbert_enabled, finbert_model=finbert_model
+                )
                 topics = classify_topics(full_text)
                 tagged_inst_ids = tag_instruments_in_text(full_text, instruments)
 

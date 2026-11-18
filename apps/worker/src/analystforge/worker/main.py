@@ -128,7 +128,13 @@ async def update_news(ctx: dict[str, Any]) -> dict[str, Any]:
     return await _run(
         ctx,
         "news",
-        lambda: ingest_news(ctx["database"], ctx["registry"], limit=150),
+        lambda: ingest_news(
+            ctx["database"],
+            ctx["registry"],
+            limit=150,
+            finbert_enabled=settings.finbert_enabled,
+            finbert_model=settings.finbert_model,
+        ),
     )
 
 

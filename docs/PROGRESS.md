@@ -128,3 +128,28 @@ remain unverified for this change. CI jobs are configured and their success is n
 The hardening commit is 787d8be. Indian reference coverage is committed separately as 2246bb0.
 Current phase records defer to these work-package statuses and cannot independently establish
 hardening or release completion.
+
+## Optional integration follow-through on 2026-11-18
+
+- Downloaded official portable Mailpit 1.33.1 into ignored .tmp storage and started an isolated
+  catcher on loopback ports 11025/18025. The application sender delivered a message whose recipient,
+  subject, plain-text body, HTML body and attachment bytes were verified through the Mailpit API.
+  `uv run python scripts/verify_mailpit.py` passed. Compose/CI now pin that version, and CI invokes
+  the same verifier against its Mailpit service. Hosted execution remains pending.
+- Real FinBERT inference passed through `scripts/verify_finbert.py --model .tmp/finbert-snapshot`
+  using an isolated uv environment with Transformers 5.22.2 and CPU PyTorch 2.15.0. The application
+  returned backend finbert and valid probabilities for all three classes. Model resolution was
+  offline. RUNBOOK.md records the official revision and weight SHA-256. Hugging Face client downloads
+  stalled, while a direct official snapshot download succeeded and matched its published checksum.
+- News ingestion now forwards FINBERT_ENABLED and FINBERT_MODEL from CLI and worker settings.
+  Disabled mode avoids optional model loading. Successful pipelines are cached per model/process,
+  and tokenizer truncation handles the 512-token limit. Four regression tests cover disabled mode,
+  configured model/caching, flat/nested pipeline outputs and enabled-mode fallback.
+- Focused sentiment, research, ingestion and worker verification passed 27 tests. Python lint/format
+  and strict quant typing passed. The exact full coverage command passed with 485 tests, three
+  explicit skips and 95.52% quant branch coverage in 295.47 seconds.
+- Live Yahoo adapter reads passed for RELIANCE.NS, TCS.NS, RELIANCE.BO and TCS.BO. All returned INR
+  bars. Three listings returned six bars between 2026-11-09 and 2026-11-17. RELIANCE.BO returned
+  three bars from 2026-11-13 through 2026-11-17. This did not write to the application database.
+- Docker/Trivy/Compose execution, authenticated Groq/FRED checks and release publication remain
+  pending. Default workspace dependencies continue to exclude optional FinBERT packages.

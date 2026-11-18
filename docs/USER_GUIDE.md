@@ -33,7 +33,8 @@ in the admin interface. Quote the response request ID when reporting an error.
 ## Indian listings
 
 The seed includes RELIANCE.NS, TCS.NS, RELIANCE.BO and TCS.BO. Only Yahoo mappings are configured
-for these listings. This is reference coverage. Persisted prices depend on a successful ingestion.
+for these listings. Live adapter reads were verified on 2026-11-18. Persisted application prices
+still depend on a successful ingestion into your configured database.
 SEC fundamentals do not cover these domestic listings through the current adapter.
 
 Exchange filings confirm the issuer symbols and scrip identifiers. Provider pages confirm the

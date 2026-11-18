@@ -95,7 +95,13 @@ def _jobs(
         "fundamentals": lambda db: ingest_fundamentals(db, registry, tickers=tickers),
         "macro": lambda db: ingest_macro(db, registry, years=years),
         "fx": lambda db: ingest_fx(db, registry, years=years),
-        "news": lambda db: ingest_news(db, registry, limit=args.limit),
+        "news": lambda db: ingest_news(
+            db,
+            registry,
+            limit=args.limit,
+            finbert_enabled=settings.finbert_enabled,
+            finbert_model=settings.finbert_model,
+        ),
     }
 
 

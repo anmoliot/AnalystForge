@@ -58,3 +58,44 @@ check migration/schema state and provider health, and scope affected tenants/res
 Verify Redis fallback and audit-write metrics. Restrict the affected ingress or job path as needed.
 After recovery, verify a representative read, authenticated mutation, audit row, calculation and
 report download. Record the cause, recovery action and any missing audit interval.
+
+## Optional integration verification
+
+The SMTP verifier uses the application's sender and checks the raw message captured by Mailpit,
+including the recipient, subject, plain-text body, HTML body and attachment bytes. It sends a
+verification message to example.invalid through a loopback catcher.
+
+On Windows, download the official portable Mailpit release into the ignored .tmp directory and
+start it in a separate terminal. Version 1.33.1 is the version used for native verification and
+the Compose/CI service pin.
+
+```powershell
+.tmp/mailpit/mailpit.exe --smtp 127.0.0.1:11025 --listen 127.0.0.1:18025 --database .tmp/mailpit-verification.db --disable-version-check
+uv run python scripts/verify_mailpit.py
+```
+
+For the Compose ports use `uv run python scripts/verify_mailpit.py --smtp-port 1025 --http-port 8025`.
+CI runs that command against its Mailpit service. Native verification does not establish Compose
+startup or external SMTP relay behaviour. [Official Mailpit releases](https://github.com/axllent/mailpit/releases).
+
+FinBERT is optional. News ingestion respects FINBERT_ENABLED and FINBERT_MODEL, caches successfully
+loaded pipelines per model/process and applies tokenizer truncation at 512 tokens. With the flag
+disabled it uses the labelled lexical path without loading Transformers. Enabled model failures
+log an exception class and use that fallback.
+
+```powershell
+uv run --with transformers==5.22.2 --with torch==2.15.0 python scripts/verify_finbert.py
+```
+
+The verifier requires real model inference and fails if the application returns a fallback. The
+extra packages are installed into an isolated uv environment. They are not default workspace
+dependencies. Model weights require a download and several hundred MB of disk/memory. A verified
+local snapshot can be selected with `--model .tmp/finbert-snapshot`. Model identifiers or paths for
+normal ingestion are configured through FINBERT_MODEL. [Official model](https://huggingface.co/ProsusAI/finbert).
+
+The verified optional environment used Transformers 5.22.2 and CPU PyTorch 2.15.0. The official
+snapshot revision was `0bc2ac10dda6929bcb1f77ccc43c7ec5c424f031`. Its model.safetensors file was
+437,965,908 bytes with SHA-256 `e5897858ff819aad7629b96ce521ae5477952d03634ef5dd30ed2d76357a9f00`.
+The snapshot directory also contains config.json, tokenizer_config.json, special_tokens_map.json
+and vocab.txt from the same revision. This host downloaded those files directly from the official
+repository after its Hugging Face client stalled. Model resolution was offline during inference.

@@ -36,8 +36,14 @@ Verified evidence is in PROGRESS.md. Historical delivery records describe earlie
   rehearsal remain pending. A generated backup file alone does not prove recoverability.
 - FinBERT and embedding-model downloads depend on available weights/network access. Lexical fallbacks
   label the selected backend. Forecast assumptions remain distinct from observed financial data.
-- The 2026-11-18 check found neither transformers nor torch installed, so FinBERT loading remains
-  unverified. No listener was found on local Mailpit ports 1025/8025. In-process SMTP integration
-  tests establish dispatch behaviour, while delivery to a running Mailpit remains unverified.
-- NSE/BSE reference coverage includes four listings, with Yahoo symbol mappings. New live price
-  ingestion and Indian fundamentals remain unverified. The listings have no SEC CIK mappings.
+- Real FinBERT inference passed on 2026-11-18 in an isolated uv environment with Transformers
+  5.22.2 and CPU PyTorch 2.15.0. Default workspace dependencies still omit these optional packages.
+  The Hugging Face client stalled during model retrieval on this host. A direct official snapshot
+  download with SHA-256 verification succeeded, and inference used that local snapshot offline.
+- Mailpit 1.33.1 delivery was verified natively on loopback ports 11025/18025, including plain text,
+  HTML and attachment bytes. Compose and external SMTP relay behaviour remain unverified. The
+  default ports 1025/8025 had no existing service. CI now includes the real Mailpit verifier.
+- NSE/BSE live Yahoo adapter reads passed on 2026-11-18 for all four seeded listings. RELIANCE.NS,
+  TCS.NS and TCS.BO returned six bars for the requested 2026-11-09 through 2026-11-17 interval.
+  RELIANCE.BO returned three bars from November 13 onward. No application database was populated
+  by this verification. Indian fundamentals remain unverified and have no SEC CIK mappings.

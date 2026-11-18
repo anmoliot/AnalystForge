@@ -38,6 +38,9 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      mailpit:
+        image: axllent/mailpit:v1.33.1
+        ports: ["1025:1025", "8025:8025"]
     env:
       ENVIRONMENT: test
       DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_test
@@ -66,6 +69,8 @@ jobs:
           git diff --exit-code -- docs/API.md
       - name: Migrations
         run: uv run alembic -c apps/api/alembic.ini upgrade head
+      - name: Mailpit delivery integration
+        run: uv run python scripts/verify_mailpit.py --smtp-port 1025 --http-port 8025
       - name: Pytest
         run: uv run pytest --cov=analystforge.quant --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=95
       - uses: actions/upload-artifact@v4

@@ -7,6 +7,7 @@ import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -298,7 +299,16 @@ _NEGATION_WORDS = {
 }
 
 
-def analyze_sentiment(text: str) -> dict[str, Any]:
+@lru_cache(maxsize=2)
+def _finbert_pipeline(model: str) -> Any:
+    from transformers import pipeline  # type: ignore
+
+    return pipeline("sentiment-analysis", model=model, top_k=None, device=-1)
+
+
+def analyze_sentiment(
+    text: str, *, finbert_enabled: bool = False, finbert_model: str = "ProsusAI/finbert"
+) -> dict[str, Any]:
     """Analyze financial sentiment using local FinBERT if available, otherwise lexical financial fallback."""
     if not text or not text.strip():
         return {
@@ -309,35 +319,38 @@ def analyze_sentiment(text: str) -> dict[str, Any]:
             "probabilities": {"positive": 0.33, "neutral": 0.34, "negative": 0.33},
         }
 
-    # Attempt FinBERT via transformers
-    try:
-        from transformers import pipeline  # type: ignore
-
-        finbert = pipeline("sentiment-analysis", model="ProsusAI/finbert", top_k=None)
-        res = finbert(text[:512])[0]
-        # Map labels to scores
-        probs = {item["label"].lower(): float(item["score"]) for item in res}
-        pos = probs.get("positive", 0.0)
-        neg = probs.get("negative", 0.0)
-        neu = probs.get("neutral", 0.0)
-        compound = pos - neg
-        label = "positive" if compound > 0.15 else ("negative" if compound < -0.15 else "neutral")
-        conf = max(pos, neg, neu)
-        return {
-            "score": round(compound, 4),
-            "label": label,
-            "confidence": round(conf, 4),
-            "backend": "finbert",
-            "probabilities": {
-                "positive": round(pos, 4),
-                "neutral": round(neu, 4),
-                "negative": round(neg, 4),
-            },
-        }
-    except Exception as exc:
-        logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
-        # Lexical financial fallback (Loughran-McDonald rules)
-        pass
+    # The configured opt-in controls optional model loading and downloads.
+    if finbert_enabled:
+        try:
+            finbert = _finbert_pipeline(finbert_model)
+            res = finbert(text, truncation=True, max_length=512)
+            if res and isinstance(res[0], list):
+                res = res[0]
+            # Map labels to scores
+            probs = {item["label"].lower(): float(item["score"]) for item in res}
+            pos = probs.get("positive", 0.0)
+            neg = probs.get("negative", 0.0)
+            neu = probs.get("neutral", 0.0)
+            compound = pos - neg
+            label = (
+                "positive" if compound > 0.15 else ("negative" if compound < -0.15 else "neutral")
+            )
+            conf = max(pos, neg, neu)
+            return {
+                "score": round(compound, 4),
+                "label": label,
+                "confidence": round(conf, 4),
+                "backend": "finbert",
+                "probabilities": {
+                    "positive": round(pos, 4),
+                    "neutral": round(neu, 4),
+                    "negative": round(neg, 4),
+                },
+            }
+        except Exception as exc:
+            logging.getLogger(__name__).warning("FinBERT unavailable (%s)", type(exc).__name__)
+            # Lexical financial fallback (Loughran-McDonald rules)
+            pass
 
     words = re.findall(r"\b[a-zA-Z-]+\b", text.lower())
     if not words:

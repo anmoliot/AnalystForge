@@ -480,3 +480,14 @@ The k6 summary exporter saves metrics and check groups only. Its setup data cont
 bearer token and is excluded. An accidental local test-token artifact was removed from the two
 unpublished commits before release preparation. Published history was unchanged, and a fresh
 full-history Gitleaks scan passed. Future CI smoke exports use this aggregate-only serializer.
+
+## Optional model and SMTP verification
+
+FinBERT remains opt-in. CLI and worker ingestion forward the configured flag/model to sentiment
+analysis. Successful CPU pipelines are cached per model and use tokenizer-based truncation.
+Verification requires a real FinBERT backend and valid three-class probabilities. Optional packages
+and downloaded model weights live outside the default dependency set, in ignored local caches.
+
+Mailpit verification uses a separate loopback catcher and the application's sender. It validates
+raw captured MIME and attachment bytes. The CI/Compose Mailpit pin matches the native version used
+for this check. This establishes native SMTP delivery while Docker orchestration remains pending.
