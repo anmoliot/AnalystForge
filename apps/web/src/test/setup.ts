@@ -8,8 +8,8 @@ class ResizeObserverMock {
   unobserve() {}
   disconnect() {}
 }
-if (typeof global !== "undefined" && !global.ResizeObserver) {
-  global.ResizeObserver = ResizeObserverMock;
+if (typeof globalThis !== "undefined" && !globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = ResizeObserverMock;
 }
 if (typeof window !== "undefined" && !window.ResizeObserver) {
   window.ResizeObserver = ResizeObserverMock;

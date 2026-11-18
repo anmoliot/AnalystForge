@@ -6,10 +6,10 @@ to target weights, calculating turnover, trade values, and transaction costs.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
-from typing import Mapping
 
 
 class TradeAction(StrEnum):
@@ -155,11 +155,11 @@ def generate_rebalance_trades(
         elif delta_sh > Decimal("0"):
             action = TradeAction.BUY
             comm = abs_trade_val * comm_rate
-            cash_delta -= (abs_trade_val + comm)
+            cash_delta -= abs_trade_val + comm
         else:
             action = TradeAction.SELL
             comm = abs_trade_val * comm_rate
-            cash_delta += (abs_trade_val - comm)
+            cash_delta += abs_trade_val - comm
 
         total_trade_value += abs_trade_val
         total_commissions += comm

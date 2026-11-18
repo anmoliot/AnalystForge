@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-import uuid
+
 import httpx
 import pytest
 from sqlalchemy import select
@@ -17,10 +18,20 @@ async def _seed_backtest_prices(db: Database, ticker: str, count: int = 60) -> N
     async with db.session() as session:
         ex = await session.get(Exchange, "NASDAQ")
         if not ex:
-            session.add(Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD"))
+            session.add(
+                Exchange(
+                    code="NASDAQ",
+                    name="Nasdaq",
+                    country="US",
+                    timezone="America/New_York",
+                    currency="USD",
+                )
+            )
             await session.flush()
 
-        inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+        inst = (
+            await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+        ).scalar_one_or_none()
         if not inst:
             inst = Instrument(
                 id=uuid.uuid4(),

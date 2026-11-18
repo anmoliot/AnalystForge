@@ -2,68 +2,54 @@
 
 from __future__ import annotations
 
-import json
+import sys
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.db import Database
 from analystforge.api.models.market import Exchange, Instrument, PriceBar
 from analystforge.api.models.news import NewsArticle, NewsArticleInstrument
-from analystforge.api.models.rag import DocumentChunk, ResearchCallLog, ResearchSession
+from analystforge.api.models.rag import DocumentChunk
 from analystforge.api.models.research import Filing, FundamentalFact
 from analystforge.api.services.filings_analytics import (
     diff_filing_sections,
-    extract_key_metrics,
     parse_filing_sections,
 )
 from analystforge.api.services.llm import set_llm_provider
 from analystforge.api.services.news_analytics import (
     analyze_sentiment,
     classify_topics,
-    cluster_articles,
     deduplicate_articles,
     extract_article_content,
-    get_sentiment_price_overlay,
     normalize_url,
-    tag_instruments_in_text,
 )
 from analystforge.api.services.research_assistant import (
     REFUSAL_MESSAGE,
     execute_research_assistant_query,
-    execute_tool,
-    generate_research_note_draft,
 )
 from analystforge.api.services.retrieval import (
     chunk_text,
     compute_bm25_lexical_scores,
     compute_semantic_scores,
     hybrid_fuse_rankings,
-    retrieve_relevant_passages,
 )
 from analystforge.providers.llm import (
-    ChatMessage,
     DeterministicFakeLLMProvider,
-    LLMRateLimitError,
-    LLMResponse,
-    ToolCall,
 )
-import sys
-from pathlib import Path
 
 # Ensure apps/api/tests directory is importable
 _TESTS_DIR = str(Path(__file__).parent)
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
-from eval_dataset import EVALUATION_QUESTIONS
-
+from eval_dataset import EVALUATION_QUESTIONS  # noqa: E402 - local fixture after path setup
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -88,16 +74,17 @@ async def seeded_research_data(db: Database) -> dict[str, Any]:
                 )
         await session.flush()
 
-        instrument_acc = 0
         instruments = {}
-        for ticker, name, sector, currency, exch_code in [
-            ("AAPL", "Apple Inc.", "Technology", "USD", "NASDAQ"),
-            ("NVDA", "Nvidia Corp.", "Technology", "USD", "NASDAQ"),
-            ("MSFT", "Microsoft Corp.", "Technology", "USD", "NASDAQ"),
-            ("SHEL.L", "Shell plc", "Energy", "GBP", "LSE"),
-            ("AZN.L", "AstraZeneca plc", "Health Care", "GBP", "LSE"),
-        ]:
-            instrument_acc += 1
+        for instrument_acc, (ticker, name, sector, currency, exch_code) in enumerate(
+            [
+                ("AAPL", "Apple Inc.", "Technology", "USD", "NASDAQ"),
+                ("NVDA", "Nvidia Corp.", "Technology", "USD", "NASDAQ"),
+                ("MSFT", "Microsoft Corp.", "Technology", "USD", "NASDAQ"),
+                ("SHEL.L", "Shell plc", "Energy", "GBP", "LSE"),
+                ("AZN.L", "AstraZeneca plc", "Health Care", "GBP", "LSE"),
+            ],
+            start=1,
+        ):
             inst = Instrument(
                 id=uuid.uuid4(),
                 exchange_code=exch_code,
@@ -282,9 +269,21 @@ def test_news_deduplication():
     assert normalize_url(u1) == normalize_url(u2)
 
     arts = [
-        {"url": u1, "title": "Fed Holds Policy Rates Steady at 5.25%", "summary": "Fed decision summary."},
-        {"url": u2, "title": "Fed Holds Policy Rates Steady at 5.25%", "summary": "Fed decision summary duplicate."},
-        {"url": "https://example.com/news/different", "title": "Tech Stocks Surge on AI Guidance", "summary": "Tech rally."},
+        {
+            "url": u1,
+            "title": "Fed Holds Policy Rates Steady at 5.25%",
+            "summary": "Fed decision summary.",
+        },
+        {
+            "url": u2,
+            "title": "Fed Holds Policy Rates Steady at 5.25%",
+            "summary": "Fed decision summary duplicate.",
+        },
+        {
+            "url": "https://example.com/news/different",
+            "title": "Tech Stocks Surge on AI Guidance",
+            "summary": "Tech rally.",
+        },
     ]
     deduped = deduplicate_articles(arts)
     assert len(deduped) == 2
@@ -345,7 +344,10 @@ def test_filings_section_diff():
     diff = diff_filing_sections(prior, current)
     assert diff["similarity_ratio"] < 1.0
     assert diff["added_paragraph_count"] >= 1
-    assert any("artificial intelligence" in r or "cybersecurity" in r for r in diff["emerging_risk_factors"])
+    assert any(
+        "artificial intelligence" in r or "cybersecurity" in r
+        for r in diff["emerging_risk_factors"]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +369,7 @@ def test_chunking_and_hybrid_scoring():
     assert bm25[0] > bm25[1]
     assert bm25[0] > bm25[2]
 
-    sem, backend = compute_semantic_scores("Apple revenue", docs)
+    sem, _backend = compute_semantic_scores("Apple revenue", docs)
     assert sem[0] > sem[1]
 
     fused = hybrid_fuse_rankings(bm25, sem)
@@ -386,9 +388,11 @@ async def test_research_assistant_query_grounded_answer(
     seeded_research_data: dict[str, Any],
 ):
     # Set deterministic fake provider with grounded response containing citations
-    fake_provider = DeterministicFakeLLMProvider({
-        "Apple": "[citation:1] Apple Inc. reported record revenue driven by Services growth. [citation:2] Diluted EPS reached $6.08 in FY2024 disclosures.",
-    })
+    fake_provider = DeterministicFakeLLMProvider(
+        {
+            "Apple": "[citation:1] Apple Inc. reported record revenue driven by Services growth. [citation:2] Diluted EPS reached $6.08 in FY2024 disclosures.",
+        }
+    )
     set_llm_provider(fake_provider)
 
     res = await client.post(
@@ -442,7 +446,10 @@ async def test_research_tool_execution(
     # Test quick_dcf tool
     res_dcf = await client.post(
         "/api/v1/research/tools/execute",
-        json={"name": "quick_dcf", "arguments": {"ticker": "AAPL", "wacc": 0.085, "terminal_growth": 0.02}},
+        json={
+            "name": "quick_dcf",
+            "arguments": {"ticker": "AAPL", "wacc": 0.085, "terminal_growth": 0.02},
+        },
     )
     assert res_dcf.status_code == 200
     data_dcf = res_dcf.json()
@@ -503,13 +510,15 @@ async def test_50_question_eval_benchmark(
     """Run full 50-question evaluation suite verifying grounding and 100% refusal on trap questions."""
     assert len(EVALUATION_QUESTIONS) == 50
 
-    fake_provider = DeterministicFakeLLMProvider({
-        "Apple": "[citation:1] Apple revenue and EPS trajectory demonstrated in audited filings.",
-        "Nvidia": "[citation:1] Nvidia data center hardware segment shows strong revenue momentum.",
-        "Microsoft": "[citation:1] Microsoft intelligent cloud and commercial subscriptions expanded.",
-        "Shell": "[citation:1] Shell operating cash flow and upstream LNG performance.",
-        "AstraZeneca": "[citation:1] AstraZeneca pharmaceutical oncology pipeline.",
-    })
+    fake_provider = DeterministicFakeLLMProvider(
+        {
+            "Apple": "[citation:1] Apple revenue and EPS trajectory demonstrated in audited filings.",
+            "Nvidia": "[citation:1] Nvidia data center hardware segment shows strong revenue momentum.",
+            "Microsoft": "[citation:1] Microsoft intelligent cloud and commercial subscriptions expanded.",
+            "Shell": "[citation:1] Shell operating cash flow and upstream LNG performance.",
+            "AstraZeneca": "[citation:1] AstraZeneca pharmaceutical oncology pipeline.",
+        }
+    )
 
     refusal_count = 0
     grounded_count = 0
@@ -528,11 +537,15 @@ async def test_50_question_eval_benchmark(
             )
 
             if expected_refusal:
-                assert result["refusal"] is True, f"Failed refusal on question {item['id']}: {query}"
+                assert result["refusal"] is True, (
+                    f"Failed refusal on question {item['id']}: {query}"
+                )
                 assert REFUSAL_MESSAGE in result["answer"]
                 refusal_count += 1
             else:
-                assert result["refusal"] is False, f"Unexpected refusal on question {item['id']}: {query}"
+                assert result["refusal"] is False, (
+                    f"Unexpected refusal on question {item['id']}: {query}"
+                )
                 assert len(result["citations"]) >= 1
                 grounded_count += 1
 

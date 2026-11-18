@@ -39,7 +39,9 @@ class Portfolio(Base, TimestampMixin):
     cost_basis_method: Mapped[str] = mapped_column(String(16), nullable=False, default="FIFO")
 
     transactions: Mapped[list[PortfolioTransaction]] = relationship(
-        back_populates="portfolio", cascade="all, delete-orphan", order_by="PortfolioTransaction.trade_date"
+        back_populates="portfolio",
+        cascade="all, delete-orphan",
+        order_by="PortfolioTransaction.trade_date",
     )
 
 
@@ -56,13 +58,17 @@ class PortfolioTransaction(Base):
         ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True
     )
     ticker: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)  # BUY, SELL, DIVIDEND, SPLIT, FEE
+    transaction_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # BUY, SELL, DIVIDEND, SPLIT, FEE
     trade_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="USD")
     fx_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("1.0"))
-    commission: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0"))
+    commission: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0.0")
+    )
     notes: Mapped[str | None] = mapped_column(Text)
     external_id: Mapped[str | None] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(

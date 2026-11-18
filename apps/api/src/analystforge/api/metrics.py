@@ -6,6 +6,11 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 REGISTRY = CollectorRegistry(auto_describe=True)
 
+AUDIT_FAILURES = Counter(
+    "analystforge_audit_write_failures_total",
+    "Mutation audit records that could not be persisted",
+    registry=REGISTRY,
+)
 HTTP_REQUESTS = Counter(
     "analystforge_http_requests_total",
     "HTTP requests processed",

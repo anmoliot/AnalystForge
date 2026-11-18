@@ -72,7 +72,9 @@ class AnalystForgeClient:
     def get_company(self, ticker: str) -> dict[str, Any]:
         return self.request("GET", f"/api/v1/companies/{ticker}")
 
-    def get_prices(self, ticker: str, start: str | None = None, end: str | None = None) -> list[dict[str, Any]]:
+    def get_prices(
+        self, ticker: str, start: str | None = None, end: str | None = None
+    ) -> list[dict[str, Any]]:
         params: dict[str, Any] = {}
         if start:
             params["start"] = start
@@ -166,7 +168,9 @@ class AnalystForgeClient:
         )
 
     # Valuation & Portfolio
-    def get_valuation(self, ticker: str, wacc: float = 0.09, terminal_growth: float = 0.025) -> dict[str, Any]:
+    def get_valuation(
+        self, ticker: str, wacc: float = 0.09, terminal_growth: float = 0.025
+    ) -> dict[str, Any]:
         return self.request(
             "POST",
             "/api/v1/valuation/dcf",
@@ -178,11 +182,10 @@ class AnalystForgeClient:
 
     # News & Filings
     def get_filings(self, ticker: str) -> list[dict[str, Any]]:
-        return self.request("GET", f"/api/v1/filings", params={"ticker": ticker})
+        return self.request("GET", "/api/v1/filings", params={"ticker": ticker})
 
     def get_news(self, ticker: str) -> list[dict[str, Any]]:
-        return self.request("GET", f"/api/v1/news", params={"ticker": ticker})
+        return self.request("GET", "/api/v1/news", params={"ticker": ticker})
 
     def integrations_meta(self) -> dict[str, Any]:
         return self.request("GET", "/api/v1/meta/integrations")
-

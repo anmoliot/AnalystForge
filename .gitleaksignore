@@ -1,0 +1,6 @@
+# Historical, demonstrably public placeholders only. Current files generate signing keys.
+# The Settings value was a named mock key with no backend record or provider.
+edd2e9d7f39b450784809960917c9e8d64b453fe:apps/web/src/pages/Settings.tsx:generic-api-key:21
+# Fixed CI-only signing and encryption test constants, never production credentials.
+18b976bcf67f6461c5c08e17741a6123f58b8c89:.github/workflows/ci.yml:generic-api-key:39
+18b976bcf67f6461c5c08e17741a6123f58b8c89:.github/workflows/ci.yml:generic-api-key:40

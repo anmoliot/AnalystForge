@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, Header, Request, Response
+from fastapi import APIRouter, Cookie, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,15 +25,14 @@ from analystforge.api.auth import (
     verify_password,
     verify_totp,
 )
-from analystforge.api.deps import CurrentUser, SessionDep, SettingsDep, get_settings
+from analystforge.api.deps import CurrentUser, SessionDep, SettingsDep
 from analystforge.api.errors import (
     AuthenticationError,
     ConflictError,
     NotFoundError,
-    PermissionDeniedError,
     ValidationFailedError,
 )
-from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, TOTPSecret, Tenant, User
+from analystforge.api.models.core import ApiKey, RefreshToken, Tenant, TOTPSecret, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -64,7 +63,7 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105 - OAuth type
     expires_in: int
 
 
@@ -129,33 +128,25 @@ def _refresh_cookie_kwargs(settings: SettingsDep) -> dict[str, Any]:  # type: ig
     }
 
 
-async def _write_audit(
-    session: AsyncSession,
+def _auth_event(
+    request: Request,
     *,
     action: str,
     entity_type: str,
     entity_id: str | None = None,
     tenant_id: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
-    request: Request | None = None,
 ) -> None:
-    log = AuditLog(
-        tenant_id=tenant_id,
-        actor_id=actor_id,
-        action=action,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        ip_address=request.client.host if request and request.client else None,
-        user_agent=request.headers.get("user-agent") if request else None,
-    )
-    session.add(log)
+    request.state.audit_action = action
+    request.state.entity_type = entity_type
+    request.state.entity_id = entity_id
+    request.state.actor_id = actor_id
+    request.state.tenant_id = tenant_id
 
 
 async def _get_active_totp(session: AsyncSession, user_id: uuid.UUID) -> TOTPSecret | None:
     result = await session.execute(
-        select(TOTPSecret).where(
-            TOTPSecret.user_id == user_id, TOTPSecret.is_verified.is_(True)
-        )
+        select(TOTPSecret).where(TOTPSecret.user_id == user_id, TOTPSecret.is_verified.is_(True))
     )
     return result.scalar_one_or_none()
 
@@ -198,14 +189,13 @@ async def register(
     session.add(user)
     await session.flush()
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="user.register",
         entity_type="user",
         entity_id=str(user.id),
         tenant_id=tenant.id,
         actor_id=user.id,
-        request=request,
     )
 
     return UserResponse(
@@ -234,13 +224,15 @@ async def login(
     result = await session.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
-    if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
-        await _write_audit(
-            session,
+    if (
+        user is None
+        or not user.password_hash
+        or not verify_password(body.password, user.password_hash)
+    ):
+        _auth_event(
+            request,
             action="user.login.failed",
             entity_type="user",
-            entity_id=body.email,
-            request=request,
         )
         raise AuthenticationError("Invalid credentials.")
 
@@ -276,14 +268,13 @@ async def login(
     )
     session.add(db_refresh)
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="user.login",
         entity_type="user",
         entity_id=str(user.id),
         tenant_id=user.tenant_id,
         actor_id=user.id,
-        request=request,
     )
 
     response.set_cookie(
@@ -330,9 +321,7 @@ async def refresh_token(
 
     if db_token.is_revoked:
         # Potential token reuse attack — revoke the whole family
-        await session.execute(
-            select(RefreshToken).where(RefreshToken.family == db_token.family)
-        )
+        await session.execute(select(RefreshToken).where(RefreshToken.family == db_token.family))
         db_token.is_revoked = True
         raise AuthenticationError("Refresh token already used.")
 
@@ -358,6 +347,8 @@ async def refresh_token(
     )
     raw_refresh = create_refresh_token()
 
+    request.state.actor_id = user.id
+    request.state.tenant_id = user.tenant_id
     new_token = RefreshToken(
         user_id=user.id,
         token_hash=hash_token(raw_refresh),
@@ -491,14 +482,13 @@ async def totp_verify(
 
     totp_rec.is_verified = True
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="user.totp.enabled",
         entity_type="user",
         entity_id=str(current_user.id),
         tenant_id=current_user.tenant_id,
         actor_id=current_user.id,
-        request=request,
     )
 
 
@@ -510,7 +500,9 @@ async def totp_disable(
     session: SessionDep,
     settings: SettingsDep,
 ) -> None:
-    if not current_user.password_hash or not verify_password(body.password, current_user.password_hash):
+    if not current_user.password_hash or not verify_password(
+        body.password, current_user.password_hash
+    ):
         raise AuthenticationError("Password confirmation failed.")
 
     result = await session.execute(
@@ -524,14 +516,13 @@ async def totp_disable(
 
     await session.delete(totp_rec)
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="user.totp.disabled",
         entity_type="user",
         entity_id=str(current_user.id),
         tenant_id=current_user.tenant_id,
         actor_id=current_user.id,
-        request=request,
     )
 
 
@@ -562,14 +553,13 @@ async def create_api_key(
     session.add(api_key)
     await session.flush()
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="api_key.created",
         entity_type="api_key",
         entity_id=str(api_key.id),
         tenant_id=current_user.tenant_id,
         actor_id=current_user.id,
-        request=request,
     )
 
     return ApiKeyCreateResponse(
@@ -589,9 +579,7 @@ async def list_api_keys(
     session: SessionDep,
 ) -> list[ApiKeyResponse]:
     result = await session.execute(
-        select(ApiKey).where(
-            ApiKey.user_id == current_user.id, ApiKey.is_active.is_(True)
-        )
+        select(ApiKey).where(ApiKey.user_id == current_user.id, ApiKey.is_active.is_(True))
     )
     keys = result.scalars().all()
     return [
@@ -623,12 +611,11 @@ async def revoke_api_key(
 
     api_key.is_active = False
 
-    await _write_audit(
-        session,
+    _auth_event(
+        request,
         action="api_key.revoked",
         entity_type="api_key",
         entity_id=str(key_id),
         tenant_id=current_user.tenant_id,
         actor_id=current_user.id,
-        request=request,
     )

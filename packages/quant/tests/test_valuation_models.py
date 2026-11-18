@@ -6,13 +6,7 @@ Exit criteria: each method matches an independent reference calculation within 0
 from __future__ import annotations
 
 from decimal import Decimal
-import pytest
 
-from analystforge.quant.dcf import (
-    DCFAssumptions,
-    TerminalValueMethod as DCFTerminalValueMethod,
-    run_dcf,
-)
 from analystforge.quant.ddm import (
     MultiStageDDMAssumptions,
     gordon_growth_ddm,
@@ -20,8 +14,10 @@ from analystforge.quant.ddm import (
 )
 from analystforge.quant.fcfe import (
     FCFEAssumptions,
-    TerminalValueMethod as FCFETerminalValueMethod,
     fcfe_valuation,
+)
+from analystforge.quant.fcfe import (
+    TerminalValueMethod as FCFETerminalValueMethod,
 )
 from analystforge.quant.football_field import (
     ValuationRange,
@@ -42,15 +38,18 @@ from analystforge.quant.sotp import (
 )
 from analystforge.quant.wacc import (
     blume_adjusted_beta,
-    capm_cost_of_equity,
 )
 
 
-def assert_within_tolerance(actual: Decimal, expected: Decimal, tolerance: Decimal = Decimal("0.0001")) -> None:
+def assert_within_tolerance(
+    actual: Decimal, expected: Decimal, tolerance: Decimal = Decimal("0.0001")
+) -> None:
     """Verify relative difference |actual - expected| / |expected| <= 0.01%."""
     diff = abs(actual - expected)
     rel_diff = diff / abs(expected)
-    assert rel_diff <= tolerance, f"Actual {actual} differs from reference {expected} by {rel_diff:.6%} (> {tolerance:.4%})"
+    assert rel_diff <= tolerance, (
+        f"Actual {actual} differs from reference {expected} by {rel_diff:.6%} (> {tolerance:.4%})"
+    )
 
 
 def test_blume_adjusted_beta_reference() -> None:
@@ -72,7 +71,13 @@ def test_fcfe_reference_calculation() -> None:
     # Cost of equity = 10%, Terminal growth = 3%, Shares = 100
     assumptions = FCFEAssumptions(
         base_net_income=Decimal("1000"),
-        net_income_growth=(Decimal("0.10"), Decimal("0.10"), Decimal("0.10"), Decimal("0.10"), Decimal("0.10")),
+        net_income_growth=(
+            Decimal("0.10"),
+            Decimal("0.10"),
+            Decimal("0.10"),
+            Decimal("0.10"),
+            Decimal("0.10"),
+        ),
         cost_of_equity=Decimal("0.10"),
         terminal_growth=Decimal("0.03"),
         shares_outstanding=Decimal("100"),
@@ -97,7 +102,9 @@ def test_fcfe_reference_calculation() -> None:
 
     # TV_5 = (1610.51 * 1.03) / (0.10 - 0.03) = 1658.8253 / 0.07 = 23697.5042857
     # PV(TV) = 23697.5042857 / 1.1^5 = 14714.2857
-    expected_pv_tv = (Decimal("1610.51") * Decimal("1.03") / Decimal("0.07")) / (Decimal("1.10") ** 5)
+    expected_pv_tv = (Decimal("1610.51") * Decimal("1.03") / Decimal("0.07")) / (
+        Decimal("1.10") ** 5
+    )
     assert_within_tolerance(result.pv_terminal_value, expected_pv_tv)
 
     expected_equity_val = expected_pv_explicit + expected_pv_tv
@@ -111,7 +118,9 @@ def test_gordon_growth_ddm_reference() -> None:
     # D0 = $4.00, r_e = 9%, g = 4%
     # D1 = 4.00 * 1.04 = $4.16
     # P0 = 4.16 / (0.09 - 0.04) = 4.16 / 0.05 = $83.20
-    res = gordon_growth_ddm(dividend_t0=Decimal("4.00"), cost_of_equity=Decimal("0.09"), growth_rate=Decimal("0.04"))
+    res = gordon_growth_ddm(
+        dividend_t0=Decimal("4.00"), cost_of_equity=Decimal("0.09"), growth_rate=Decimal("0.04")
+    )
     expected_p0 = Decimal("83.20")
     assert_within_tolerance(res.implied_share_price, expected_p0)
     assert res.dividend_yield == Decimal("0.05")  # 4.16 / 83.20 = 5%
@@ -184,7 +193,9 @@ def test_sotp_reference_calculation() -> None:
     segments = [
         SegmentValuation("Cloud", "EBITDA", Decimal("500"), Decimal("20")),
         SegmentValuation("Hardware", "Revenue", Decimal("2000"), Decimal("2")),
-        SegmentValuation("Services", "EBITDA", Decimal("200"), Decimal("15"), ownership_pct=Decimal("0.80")),
+        SegmentValuation(
+            "Services", "EBITDA", Decimal("200"), Decimal("15"), ownership_pct=Decimal("0.80")
+        ),
     ]
     res = sotp_valuation(
         segments,
@@ -231,12 +242,49 @@ def test_precedent_transactions_reference() -> None:
 
 def test_football_field_consolidation() -> None:
     ranges = [
-        ValuationRange("dcf_fcff", "DCF (FCFF)", "Intrinsic", Decimal("140.00"), Decimal("160.00"), Decimal("185.00")),
-        ValuationRange("dcf_fcfe", "DCF (FCFE)", "Intrinsic", Decimal("135.00"), Decimal("155.00"), Decimal("180.00")),
-        ValuationRange("comps_ebitda", "Comps EV/EBITDA", "Comps", Decimal("130.00"), Decimal("150.00"), Decimal("170.00")),
-        ValuationRange("comps_pe", "Comps P/E", "Comps", Decimal("125.00"), Decimal("148.00"), Decimal("175.00")),
-        ValuationRange("sotp", "SOTP", "Asset-Based", Decimal("150.00"), Decimal("165.00"), Decimal("190.00")),
-        ValuationRange("market_52w", "52-Week Range", "Market", Decimal("120.00"), Decimal("152.00"), Decimal("178.00")),
+        ValuationRange(
+            "dcf_fcff",
+            "DCF (FCFF)",
+            "Intrinsic",
+            Decimal("140.00"),
+            Decimal("160.00"),
+            Decimal("185.00"),
+        ),
+        ValuationRange(
+            "dcf_fcfe",
+            "DCF (FCFE)",
+            "Intrinsic",
+            Decimal("135.00"),
+            Decimal("155.00"),
+            Decimal("180.00"),
+        ),
+        ValuationRange(
+            "comps_ebitda",
+            "Comps EV/EBITDA",
+            "Comps",
+            Decimal("130.00"),
+            Decimal("150.00"),
+            Decimal("170.00"),
+        ),
+        ValuationRange(
+            "comps_pe",
+            "Comps P/E",
+            "Comps",
+            Decimal("125.00"),
+            Decimal("148.00"),
+            Decimal("175.00"),
+        ),
+        ValuationRange(
+            "sotp", "SOTP", "Asset-Based", Decimal("150.00"), Decimal("165.00"), Decimal("190.00")
+        ),
+        ValuationRange(
+            "market_52w",
+            "52-Week Range",
+            "Market",
+            Decimal("120.00"),
+            Decimal("152.00"),
+            Decimal("178.00"),
+        ),
     ]
     ff = build_football_field(ranges, current_share_price=Decimal("152.50"))
     assert len(ff.ranges) == 6

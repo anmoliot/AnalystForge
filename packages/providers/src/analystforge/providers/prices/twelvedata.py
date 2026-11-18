@@ -87,7 +87,9 @@ class TwelveDataPricesProvider(PricesProvider):
             code = payload.get("code")
             msg = payload.get("message", "Unknown Twelve Data error")
             retryable = code == 429
-            raise ProviderError(self.name, f"Twelve Data error ({code}): {msg}", retryable=retryable)
+            raise ProviderError(
+                self.name, f"Twelve Data error ({code}): {msg}", retryable=retryable
+            )
 
         values = payload.get("values")
         if not isinstance(values, list) or not values:

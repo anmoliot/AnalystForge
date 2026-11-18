@@ -16,11 +16,11 @@ Supports:
 from __future__ import annotations
 
 import asyncio
-import math
 import uuid
-from datetime import date, datetime, timezone
+from collections.abc import Callable, Sequence
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Annotated, Any, Callable, Sequence
+from typing import Annotated, Any
 
 import numpy as np
 import pandas as pd
@@ -36,10 +36,9 @@ from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.quant.backtest import (
     LookAheadBiasError,
     SandboxSecurityError,
+    SandboxUnavailableError,
     check_lookahead_bias,
-    deflated_sharpe_ratio,
     evaluate_rule_group,
-    run_out_of_sample_split,
     run_parameter_sweep_2d,
     run_sandboxed_strategy,
     run_strategy_simulation,
@@ -71,7 +70,9 @@ _BACKTEST_TASKS: dict[str, asyncio.Task[Any]] = {}
 
 class BacktestRunRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=32)
-    strategy_name: str = Field(default="SMA_CROSSOVER")  # SMA_CROSSOVER, RSI_MOMENTUM, MEAN_REVERSION, BUY_AND_HOLD
+    strategy_name: str = Field(
+        default="SMA_CROSSOVER"
+    )  # SMA_CROSSOVER, RSI_MOMENTUM, MEAN_REVERSION, BUY_AND_HOLD
     start_date: date | None = None
     end_date: date | None = None
     initial_capital: float = Field(default=100000.0, gt=0)
@@ -180,9 +181,13 @@ async def _load_price_history(
             .order_by(PriceBar.ts)
         )
         if start_date:
-            query = query.where(PriceBar.ts >= datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc))
+            query = query.where(
+                PriceBar.ts >= datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+            )
         if end_date:
-            query = query.where(PriceBar.ts <= datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc))
+            query = query.where(
+                PriceBar.ts <= datetime.combine(end_date, datetime.max.time(), tzinfo=UTC)
+            )
 
         bar_rows = (await session.execute(query)).fetchall()
 
@@ -199,15 +204,17 @@ async def _load_price_history(
     records: list[dict[str, Any]] = []
     for r in bar_rows:
         ts, op, hi, lo, cl, vol = r
-        records.append({
-            "date": ts.date(),
-            "open": float(op) if op is not None else float(cl),
-            "high": float(hi) if hi is not None else float(cl),
-            "low": float(lo) if lo is not None else float(cl),
-            "close": float(cl),
-            "volume": float(vol) if vol is not None else 0.0,
-            "ticker": ticker_clean,
-        })
+        records.append(
+            {
+                "date": ts.date(),
+                "open": float(op) if op is not None else float(cl),
+                "high": float(hi) if hi is not None else float(cl),
+                "low": float(lo) if lo is not None else float(cl),
+                "close": float(cl),
+                "volume": float(vol) if vol is not None else 0.0,
+                "ticker": ticker_clean,
+            }
+        )
 
     return pd.DataFrame(records)
 
@@ -217,6 +224,7 @@ def _build_builtin_signal_fn(
     params: dict[str, Any],
 ) -> Callable[[pd.DataFrame], Sequence[int]]:
     """Build a deterministic signal generator function for built-in strategies."""
+
     def signal_fn(df: pd.DataFrame) -> Sequence[int]:
         n = len(df)
         closes = df["close"].to_numpy(dtype=float)
@@ -258,7 +266,9 @@ def _build_builtin_signal_fn(
             num_std = float(params.get("num_std", 2.0))
 
             rolling_mean = df["close"].rolling(window=window, min_periods=1).mean().to_numpy()
-            rolling_std = df["close"].rolling(window=window, min_periods=1).std().fillna(0.0).to_numpy()
+            rolling_std = (
+                df["close"].rolling(window=window, min_periods=1).std().fillna(0.0).to_numpy()
+            )
             lower_band = rolling_mean - (num_std * rolling_std)
 
             return np.where(closes <= lower_band, 1, 0)
@@ -352,7 +362,9 @@ async def _persist_and_format_run(
         "final_value": float(loaded_run.final_value),
         "total_return": float(loaded_run.total_return),
         "cagr": float(loaded_run.cagr) if loaded_run.cagr is not None else None,
-        "sharpe_ratio": float(loaded_run.sharpe_ratio) if loaded_run.sharpe_ratio is not None else None,
+        "sharpe_ratio": float(loaded_run.sharpe_ratio)
+        if loaded_run.sharpe_ratio is not None
+        else None,
         "sortino_ratio": metrics.sortino_ratio,
         "calmar_ratio": metrics.calmar_ratio,
         "max_drawdown": float(loaded_run.max_drawdown),
@@ -501,17 +513,28 @@ async def run_custom_python_backtest(
 
     # 2. Look-ahead check in sandbox
     if payload.check_lookahead:
+
         def sandboxed_sig_fn(d: pd.DataFrame) -> list[int]:
             return run_sandboxed_strategy(payload.code, d, wall_time_timeout=5.0)
 
         try:
             check_lookahead_bias(sandboxed_sig_fn, df)
+        except SandboxUnavailableError as unavail_err:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=str(unavail_err),
+            ) from unavail_err
         except LookAheadBiasError as exc:
             raise ValidationFailedError(str(exc)) from exc
 
     # 3. Execute strategy
     try:
         signals = run_sandboxed_strategy(payload.code, df, wall_time_timeout=6.0)
+    except SandboxUnavailableError as unavail_err:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(unavail_err),
+        ) from unavail_err
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -553,11 +576,13 @@ async def run_walk_forward(
     df = await _load_price_history(session, ticker, payload.start_date, payload.end_date)
 
     if payload.strategy_type == "RULE" and payload.rule_group:
+
         def sig_fn(d: pd.DataFrame) -> Sequence[int]:
             mask = evaluate_rule_group(d, payload.rule_group or {})
             return np.where(mask.to_numpy(), 1, 0)
     elif payload.strategy_type == "PYTHON" and payload.code:
         scan_code_ast(payload.code)
+
         def sig_fn(d: pd.DataFrame) -> Sequence[int]:
             return run_sandboxed_strategy(payload.code or "", d, wall_time_timeout=5.0)
     else:
@@ -704,7 +729,7 @@ async def create_backtest_job(
         "job_type": req.job_type,
         "status": "queued",
         "progress": 0.0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "result": None,
         "error": None,
     }
@@ -822,7 +847,9 @@ async def get_backtest(
         "final_value": float(run_record.final_value),
         "total_return": float(run_record.total_return),
         "cagr": float(run_record.cagr) if run_record.cagr is not None else None,
-        "sharpe_ratio": float(run_record.sharpe_ratio) if run_record.sharpe_ratio is not None else None,
+        "sharpe_ratio": float(run_record.sharpe_ratio)
+        if run_record.sharpe_ratio is not None
+        else None,
         "max_drawdown": float(run_record.max_drawdown),
         "win_rate": float(run_record.win_rate),
         "trades_count": run_record.trades_count,

@@ -8,10 +8,11 @@ public CSV download endpoint as a keyless fallback. Missing observations publish
 from __future__ import annotations
 
 import csv
+import io
+import logging
+import os
 from datetime import date
 from decimal import Decimal, InvalidOperation
-import io
-import os
 from typing import Any
 
 from analystforge.providers.base import MacroProvider
@@ -74,6 +75,7 @@ class FredProvider(MacroProvider):
                 return True, None
             return False, data.get("error_message", "Unexpected response structure from FRED API")
         except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             return False, str(exc)
 
     async def fetch_series(self, spec: MacroSeriesSpec, start: date, end: date) -> MacroSeries:
@@ -94,7 +96,10 @@ class FredProvider(MacroProvider):
                     ttl_seconds=_CACHE_TTL_SECONDS,
                 )
                 return self._parse_json(spec, data)
-            except Exception:
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "operation unavailable (%s)", type(exc).__name__
+                )
                 # Graceful fallback to CSV endpoint if JSON endpoint fails
                 pass
 
@@ -112,7 +117,9 @@ class FredProvider(MacroProvider):
     def _parse_json(self, spec: MacroSeriesSpec, data: dict[str, Any]) -> MacroSeries:
         observations = data.get("observations")
         if observations is None:
-            raise ProviderDataError(self.name, f"response for {spec.code} missing observations list")
+            raise ProviderDataError(
+                self.name, f"response for {spec.code} missing observations list"
+            )
         points: list[MacroPoint] = []
         for row in observations:
             raw_date = row.get("date")
@@ -121,7 +128,9 @@ class FredProvider(MacroProvider):
             try:
                 day = date.fromisoformat(str(raw_date).strip())
             except ValueError as exc:
-                raise ProviderDataError(self.name, f"invalid date for {spec.code}: {raw_date}") from exc
+                raise ProviderDataError(
+                    self.name, f"invalid date for {spec.code}: {raw_date}"
+                ) from exc
             raw_val = row.get("value")
             if raw_val in {"", ".", None}:
                 points.append(MacroPoint(day=day, value=None))
@@ -129,7 +138,9 @@ class FredProvider(MacroProvider):
             try:
                 value = Decimal(str(raw_val).strip())
             except InvalidOperation as exc:
-                raise ProviderDataError(self.name, f"invalid value for {spec.code}: {raw_val}") from exc
+                raise ProviderDataError(
+                    self.name, f"invalid value for {spec.code}: {raw_val}"
+                ) from exc
             points.append(MacroPoint(day=day, value=value))
         points.sort(key=lambda point: point.day)
         return MacroSeries(spec=spec, points=points)

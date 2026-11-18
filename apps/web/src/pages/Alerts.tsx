@@ -50,39 +50,10 @@ export default function Alerts() {
   const [channel, setChannel] = useState("IN_APP");
 
   // Fetch rules
-  const { data: rules = [] } = useQuery<AlertRuleItem[]>({
+  const { data: rules = [], error: listError } = useQuery<AlertRuleItem[]>({
     queryKey: ["alert-rules"],
     queryFn: async () => {
-      try {
-        return await api.get<AlertRuleItem[]>("/api/v1/alerts/rules");
-      } catch {
-        return [
-          {
-            id: "1",
-            name: "NVIDIA Breakout Watch",
-            ticker: "NVDA",
-            metric_type: "PRICE",
-            condition: "GREATER_THAN",
-            threshold_value: 150.0,
-            notification_channel: "IN_APP",
-            is_active: true,
-            last_triggered_at: null,
-            created_at: "2026-11-15T10:00:00Z",
-          },
-          {
-            id: "2",
-            name: "Apple Value Dip",
-            ticker: "AAPL",
-            metric_type: "PE",
-            condition: "LESS_THAN",
-            threshold_value: 28.0,
-            notification_channel: "EMAIL",
-            is_active: true,
-            last_triggered_at: null,
-            created_at: "2026-11-15T11:00:00Z",
-          },
-        ];
-      }
+      return api.get<AlertRuleItem[]>("/api/v1/alerts/rules");
     },
   });
 
@@ -143,14 +114,15 @@ export default function Alerts() {
 
   return (
     <div className="space-y-6">
+      {listError && <p role="alert">Unavailable. {listError.message}</p>}
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Bell className="h-6 w-6 text-brand-400" />
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Market & Valuation Alerts</h1>
+            <Bell className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Market & Valuation Alerts</h1>
           </div>
-          <p className="mt-1 text-sm text-neutral-400">
+          <p className="mt-1 text-sm text-muted">
             Real-time threshold surveillance for price action, valuation multiples, and filing disclosures.
           </p>
         </div>
@@ -180,8 +152,8 @@ export default function Alerts() {
       <Panel className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-neutral-800 p-4">
           <div className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-brand-400" />
-            <h2 className="text-base font-medium text-white">Active Alert Rules</h2>
+            <Radio className="h-5 w-5 text-accent" />
+            <h2 className="text-base font-medium text-ink">Active Alert Rules</h2>
             <Badge tone="neutral" className="ml-2">
               {rules.length} configured
             </Badge>
@@ -189,17 +161,17 @@ export default function Alerts() {
         </div>
 
         {rules.length === 0 ? (
-          <div className="p-12 text-center text-neutral-400">
-            <Bell className="mx-auto mb-3 h-8 w-8 text-neutral-600" />
+          <div className="p-12 text-center text-muted">
+            <Bell className="mx-auto mb-3 h-8 w-8 text-muted" />
             <p className="text-sm">No alert rules configured yet.</p>
-            <p className="text-xs text-neutral-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Click &quot;New Alert Rule&quot; to set price or valuation threshold triggers.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-neutral-300">
-              <thead className="border-b border-neutral-800 bg-neutral-900/60 text-xs uppercase tracking-wider text-neutral-400">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-neutral-800 bg-elevated/60 text-xs uppercase tracking-wider text-muted">
                 <tr>
                   <th className="px-4 py-3">Rule Name</th>
                   <th className="px-4 py-3">Ticker</th>
@@ -213,20 +185,20 @@ export default function Alerts() {
               </thead>
               <tbody className="divide-y divide-neutral-800">
                 {rules.map((rule) => (
-                  <tr key={rule.id} className="hover:bg-neutral-800/40">
-                    <td className="px-4 py-3 font-medium text-white">{rule.name}</td>
-                    <td className="px-4 py-3 font-mono font-semibold text-brand-400">
+                  <tr key={rule.id} className="hover:bg-elevated/40">
+                    <td className="px-4 py-3 font-medium text-ink">{rule.name}</td>
+                    <td className="px-4 py-3 font-mono font-semibold text-accent">
                       {rule.ticker}
                     </td>
-                    <td className="px-4 py-3 text-xs text-neutral-300">{rule.metric_type}</td>
-                    <td className="px-4 py-3 text-xs text-neutral-400">
+                    <td className="px-4 py-3 text-xs text-ink">{rule.metric_type}</td>
+                    <td className="px-4 py-3 text-xs text-muted">
                       {rule.condition === "GREATER_THAN" ? "Greater than (>)" : "Less than (<)"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium text-white">
+                    <td className="px-4 py-3 text-right font-mono font-medium text-ink">
                       {rule.threshold_value}
                     </td>
-                    <td className="px-4 py-3 text-xs text-neutral-400">
-                      <span className="rounded bg-neutral-800 px-2 py-0.5 text-neutral-300">
+                    <td className="px-4 py-3 text-xs text-muted">
+                      <span className="rounded bg-elevated px-2 py-0.5 text-ink">
                         {rule.notification_channel}
                       </span>
                     </td>
@@ -238,7 +210,7 @@ export default function Alerts() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => deleteMutation.mutate(rule.id)}
-                        className="text-neutral-400 transition hover:text-rose-400"
+                        className="text-muted transition hover:text-negative"
                         title="Delete Rule"
                         data-testid={`delete-rule-${rule.id}`}
                       >
@@ -257,14 +229,14 @@ export default function Alerts() {
       <Panel className="p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-brand-400" />
-            <h2 className="text-base font-medium text-white">Recent Alert Events</h2>
+            <Clock className="h-5 w-5 text-accent" />
+            <h2 className="text-base font-medium text-ink">Recent Alert Events</h2>
           </div>
           <Badge tone="neutral">{events.length} Events</Badge>
         </div>
 
         {events.length === 0 ? (
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted">
             No events have triggered yet. When market prices or ratios breach your thresholds, events appear here.
           </p>
         ) : (
@@ -272,19 +244,19 @@ export default function Alerts() {
             {events.map((e) => (
               <div
                 key={e.id}
-                className="flex items-start justify-between rounded-lg border border-neutral-800 bg-neutral-900/60 p-3"
+                className="flex items-start justify-between rounded-lg border border-neutral-800 bg-elevated/60 p-3"
               >
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="mt-0.5 h-4 w-4 text-brand-400" />
+                  <AlertCircle className="mt-0.5 h-4 w-4 text-accent" />
                   <div>
-                    <span className="font-semibold text-sm text-white">{e.ticker}: </span>
-                    <span className="text-sm text-neutral-200">{e.message}</span>
-                    <p className="mt-1 text-xs text-neutral-400">
+                    <span className="font-semibold text-sm text-ink">{e.ticker}: </span>
+                    <span className="text-sm text-ink">{e.message}</span>
+                    <p className="mt-1 text-xs text-muted">
                       Triggered Value: {e.trigger_value} (Threshold: {e.threshold_value})
                     </p>
                   </div>
                 </div>
-                <span className="text-xs text-neutral-400">{e.triggered_at}</span>
+                <span className="text-xs text-muted">{e.triggered_at}</span>
               </div>
             ))}
           </div>
@@ -294,52 +266,52 @@ export default function Alerts() {
       {/* Create Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-elevated p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Create Alert Rule</h3>
+              <h3 className="text-lg font-semibold text-ink">Create Alert Rule</h3>
               <button
                 onClick={() => setModalOpen(false)}
-                className="text-neutral-400 hover:text-white"
+                className="text-muted hover:text-ink"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Rule Name
                 </label>
-                <input
+                <input aria-label="Rule Name"
                   type="text"
                   placeholder="e.g. NVDA Breakout Alert"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                   data-testid="alert-name-input"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Ticker
                   </label>
-                  <input
+                  <input aria-label="Ticker"
                     type="text"
                     value={ticker}
                     onChange={(e) => setTicker(e.target.value)}
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 uppercase focus:border-brand-500 focus:outline-none"
+                    className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink uppercase focus:border-brand-500 focus:outline-none"
                     data-testid="alert-ticker-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Metric
                   </label>
-                  <select
+                  <select aria-label="Metric"
                     value={metricType}
                     onChange={(e) => setMetricType(e.target.value)}
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                    className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                   >
                     <option value="PRICE">Price</option>
                     <option value="PE">P/E Ratio</option>
@@ -351,42 +323,42 @@ export default function Alerts() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Condition
                   </label>
-                  <select
+                  <select aria-label="Condition"
                     value={condition}
                     onChange={(e) => setCondition(e.target.value)}
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                    className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                   >
                     <option value="GREATER_THAN">Greater than (&gt;)</option>
                     <option value="LESS_THAN">Less than (&lt;)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Threshold Value
                   </label>
-                  <input
+                  <input aria-label="Threshold Value"
                     type="number"
                     step="0.01"
                     placeholder="150.0"
                     value={thresholdValue}
                     onChange={(e) => setThresholdValue(e.target.value)}
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                    className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                     data-testid="alert-threshold-input"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Notification Channel
                 </label>
-                <select
+                <select aria-label="Notification Channel"
                   value={channel}
                   onChange={(e) => setChannel(e.target.value)}
-                  className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                 >
                   <option value="IN_APP">In-App Notification</option>
                   <option value="EMAIL">Email Alert</option>

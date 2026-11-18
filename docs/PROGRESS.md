@@ -16,7 +16,7 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 | **WP7** | Reporting and exports (PDF, PPTX tear sheets, Excel live formulas, Python SDK) | **Complete** | Built unified multi-format reporting service in `apps/api/src/analystforge/api/services/reports.py` supporting ReportLab PDF (`generate_pdf_report`), 16:9 widescreen PowerPoint (`generate_pptx_report` via `python-pptx`), live formula Excel (`generate_excel_report` via `xlsxwriter`), CSV, JSON, and Markdown; templates include Company Tear Sheet, Valuation Summary, DCF Model, Portfolio Review, Risk Report, and Backtest Performance; verified live formula recalculation (`=AVERAGE(...)`, `=SUM(...)`, `=B6-B7`) in Excel zip structure; strict format validation rejecting unsupported formats with HTTP 422 Unprocessable Content; report email dispatch via SMTP with binary file attachments in `services/alerts.py`; expanded Python SDK `analystforge_sdk.AnalystForgeClient` with `download_report`, `email_report`, `get_valuation`, `get_portfolio`, `get_filings`, `get_news`, and `integrations_meta`; SDK integration tests and API tests pass in `apps/api/tests/test_reports_wp7.py` and `packages/sdk-python/tests/test_sdk.py`. 106 API tests and 242 package tests pass. |
 | **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | **Complete** | Implemented secondary key-authenticated market data adapters: `TwelveDataPricesProvider` (`twelvedata.py`) and `AlphaVantagePricesProvider` (`alphavantage.py`); registered in `_PRICE_ADAPTERS` and `ProviderRegistry`; configured graceful degradation when keys are absent via `is_configured()`; tested multi-tier failover in `packages/providers/tests/test_secondary_prices_wp8.py` (Yahoo 500 error → Stooq browser challenge → Twelve Data ok with full `FailoverTrace` attempt recording); documented in `.env.example`; verified Continental European coverage with Deutsche Börse XETRA. All 75 provider tests pass. |
 | **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | **Complete** | Validated arq worker job suite in `apps/worker/src/analystforge/worker/main.py` with cron schedules for alerts (every 15 min), scheduled screens (twice daily), macro, prices, and news updates; implemented operational maintenance and database cleanup in `apps/api/src/analystforge/api/services/maintenance.py` (`run_operational_cleanup` deactivating expired `ShareLink`s, purging revoked `RefreshToken`s, and pruning stale health logs); updated `docker-compose.yml` with Groq LLM variables, mailpit SMTP catcher, and secondary providers; unit tests in `apps/worker/tests/test_worker_wp9.py` pass. |
-| **WP10** | Hardening & audits (Security, accessibility, performance) | Planned | |
+| **WP10** | Hardening & audits (Security, accessibility, performance) | Implemented, local gates passed | See WP10 executed evidence below. Container/Trivy and CI PostgreSQL browser execution remain unverified. |
 | **WP11** | Truthful documentation & release | Planned | |
 
 ---
@@ -60,3 +60,41 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
   PostgreSQL directly plus `uv run pytest` and `npm test` (the `make test` equivalents). Docker
   and Make deliverables are validated by CI builds where possible.
 - Playwright Chromium installed; `npm test`, typecheck, lint and build are green.
+
+## WP10 executed evidence on 2026-11-17
+
+Verification ran on Windows 11 with Python 3.12, uv and Node 22. PowerShell invoked
+`%USERPROFILE%/.local/bin/uv.exe` because uv is absent from its default PATH.
+
+| Command | Result |
+|---|---|
+| `uv sync --all-packages` | Passed |
+| `uv run pytest --collect-only -q` | Passed, initially 355 collected before added hardening tests |
+| `uv run ruff check .` | Passed |
+| `uv run ruff format --check .` | Passed |
+| `uv run mypy packages/quant/src` | Passed, 31 source files |
+| `uv run pytest --cov=analystforge.quant --cov-branch --cov-report=term-missing --cov-fail-under=95` | Passed, 481 tests, 3 explicit skips, 95.52% quant branch coverage |
+| `cd apps/web; npm run lint; npm run typecheck; npm test -- --run; npm run build` | Passed, 20 tests across 13 files |
+| `cd apps/web; npm run test:e2e` | Passed, real API workflows, populated DCF and axe audit |
+| `npm audit --audit-level=high` | Passed, 9 moderate findings remain |
+| `uv tool run pip-audit --path .venv/Lib/site-packages --format json --output .tmp/wp10-pip-audit.json` | Passed, no known vulnerabilities |
+| `.tmp/gitleaks/gitleaks.exe git --redact --log-opts=--all --report-format json --report-path .tmp/wp10-gitleaks.json .` | Passed, 22 commits, exact historical public-placeholder exceptions in .gitleaksignore |
+| `BASE_URL=http://127.0.0.1:8766 k6 run --no-usage-report --summary-export=.tmp/wp10-smoke.json tests/load/smoke.js` | Passed, 47 requests, 45 checks, zero failures, p95 100.56 ms |
+
+The three pytest skips cover Linux sandbox execution on Windows and live FRED/Groq tests
+without configured keys. Existing tests were retained. Repository-wide lint and format cleanup
+was needed for the requested gates. The original five sandbox edits were incorporated.
+
+Browser evidence uses an ephemeral SQLite database, the ordinary application and recorded
+market/SEC fixtures. See `tests/e2e/fixtures/README.md`. Requests are not intercepted.
+The 18 screenshots under `docs/screenshots/wp10-*` show historical coverage, explicit DCF
+reviewer assumptions and unavailable states. They do not attest to current provider health,
+complete statements or paid-provider coverage. CI configures a separate PostgreSQL test database.
+The axe report in `docs/screenshots/wp10-accessibility.json` has no serious/critical violations.
+
+Official portable k6 2.3.0 ran locally from .tmp. Only the smoke profile was executed.
+Load/stress profiles are implemented. `tests/load/smoke-result.json` preserves the summary.
+The test server raises API quotas to measure endpoint performance.
+
+Docker Engine and GNU Make are absent. Docker/Nginx runtime behaviour and Trivy execution
+remain unverified for this change. CI jobs are configured and their success is not claimed.

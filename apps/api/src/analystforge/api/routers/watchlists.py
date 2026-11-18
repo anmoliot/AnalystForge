@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import selectinload
@@ -116,16 +116,18 @@ async def get_watchlist(
                 price = float(bar.close)
                 as_of = bar.ts.date().isoformat()
 
-        items_with_prices.append({
-            "id": str(it.id),
-            "ticker": it.ticker,
-            "name": inst.name if inst else it.ticker,
-            "current_price": price,
-            "target_price": float(it.target_price) if it.target_price is not None else None,
-            "notes": it.notes,
-            "as_of": as_of,
-            "created_at": it.created_at.isoformat(),
-        })
+        items_with_prices.append(
+            {
+                "id": str(it.id),
+                "ticker": it.ticker,
+                "name": inst.name if inst else it.ticker,
+                "current_price": price,
+                "target_price": float(it.target_price) if it.target_price is not None else None,
+                "notes": it.notes,
+                "as_of": as_of,
+                "created_at": it.created_at.isoformat(),
+            }
+        )
 
     return {
         "id": str(wl.id),
@@ -152,7 +154,9 @@ async def add_watchlist_item(
     item = WatchlistItem(
         watchlist_id=wl.id,
         ticker=ticker_clean,
-        target_price=Decimal(str(payload.target_price)) if payload.target_price is not None else None,
+        target_price=Decimal(str(payload.target_price))
+        if payload.target_price is not None
+        else None,
         notes=payload.notes,
     )
     session.add(item)
@@ -169,7 +173,9 @@ async def add_watchlist_item(
     }
 
 
-@router.delete("/{watchlist_id}/items/{item_id}", status_code=204, summary="Remove ticker from watchlist")
+@router.delete(
+    "/{watchlist_id}/items/{item_id}", status_code=204, summary="Remove ticker from watchlist"
+)
 async def delete_watchlist_item(
     watchlist_id: uuid.UUID,
     item_id: uuid.UUID,

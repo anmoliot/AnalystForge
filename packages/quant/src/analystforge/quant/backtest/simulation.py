@@ -12,8 +12,9 @@ Simulates strategy execution with realistic market frictions:
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -175,7 +176,7 @@ def run_strategy_simulation(
 
                 if is_long:
                     gross_pnl = position * (exec_exit_price - entry_price)
-                    cash += (position * exec_exit_price - comm)
+                    cash += position * exec_exit_price - comm
                 else:
                     # Short pnl = (entry - exit) * abs(position)
                     gross_pnl = abs(position) * (entry_price - exec_exit_price)
@@ -238,7 +239,7 @@ def run_strategy_simulation(
                         total_slippage_paid += slip_loss
 
                         if is_long:
-                            cash -= (trade_val + comm)
+                            cash -= trade_val + comm
                             position = qty
                             trade_type = "LONG"
                         else:
@@ -265,7 +266,9 @@ def run_strategy_simulation(
 
         equity_series.append(
             {
-                "date": curr_date.isoformat() if hasattr(curr_date, "isoformat") else str(curr_date),
+                "date": curr_date.isoformat()
+                if hasattr(curr_date, "isoformat")
+                else str(curr_date),
                 "equity": round(current_equity, 2),
                 "benchmark": round(bench_equity, 2),
                 "cash": round(cash, 2),
@@ -315,8 +318,12 @@ def run_strategy_simulation(
     eq_series_vals = eq_df["equity"]
     returns_series = eq_series_vals.pct_change().dropna()
 
-    ann_sharpe = sharpe(returns_series, risk_free=risk_free_rate) if len(returns_series) >= 2 else None
-    ann_sortino = sortino(returns_series, risk_free=risk_free_rate) if len(returns_series) >= 2 else None
+    ann_sharpe = (
+        sharpe(returns_series, risk_free=risk_free_rate) if len(returns_series) >= 2 else None
+    )
+    ann_sortino = (
+        sortino(returns_series, risk_free=risk_free_rate) if len(returns_series) >= 2 else None
+    )
     ann_calmar = calmar(returns_series) if len(returns_series) >= 2 else None
     mdd = max_drawdown(eq_series_vals) if len(eq_series_vals) >= 2 else 0.0
     cagr_val = cagr(eq_series_vals) if len(eq_series_vals) >= 2 else None
@@ -327,7 +334,9 @@ def run_strategy_simulation(
     win_rate = float(len(win_trades) / len(trades)) if trades else 0.0
     total_gains = sum((t.net_pnl for t in win_trades), 0.0)
     total_losses = abs(sum((t.net_pnl for t in lose_trades), 0.0))
-    profit_factor = (total_gains / total_losses) if total_losses > 0 else (999.0 if total_gains > 0 else None)
+    profit_factor = (
+        (total_gains / total_losses) if total_losses > 0 else (999.0 if total_gains > 0 else None)
+    )
     avg_trade = float(np.mean([t.net_pnl for t in trades])) if trades else 0.0
 
     metrics = SimulationMetrics(

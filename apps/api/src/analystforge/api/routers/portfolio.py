@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
@@ -19,7 +19,6 @@ from analystforge.api.errors import DataUnavailableError, NotFoundError, Validat
 from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.api.models.portfolio import Portfolio, PortfolioTransaction
 from analystforge.api.services.portfolio import (
-    HoldingItem,
     compute_black_litterman_portfolio,
     compute_fama_french_exposure,
     compute_holdings_fifo,
@@ -31,7 +30,6 @@ from analystforge.api.services.portfolio import (
     latest_prices,
     load_price_histories,
     optimize_weights,
-    parse_csv_transactions,
     parse_transactions_file,
     preview_transactions_file,
 )
@@ -288,7 +286,10 @@ async def list_transactions(
     ]
 
 
-@router.post("/{portfolio_id}/import/preview", summary="Preview transactions file with column mapping suggestions")
+@router.post(
+    "/{portfolio_id}/import/preview",
+    summary="Preview transactions file with column mapping suggestions",
+)
 async def preview_transactions(
     portfolio_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -303,7 +304,10 @@ async def preview_transactions(
     return preview_transactions_file(content, file.filename or "transactions.csv")
 
 
-@router.post("/{portfolio_id}/import", summary="Import transactions from CSV or Excel with column mapping & validation report")
+@router.post(
+    "/{portfolio_id}/import",
+    summary="Import transactions from CSV or Excel with column mapping & validation report",
+)
 async def import_transactions(
     portfolio_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -387,11 +391,16 @@ async def download_import_report(
     return Response(
         content=content,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="validation_report_{portfolio_id}.csv"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="validation_report_{portfolio_id}.csv"'
+        },
     )
 
 
-@router.get("/{portfolio_id}/risk", summary="Quantitative risk analytics suite (VaR, CVaR, Sharpe, Drawdown)")
+@router.get(
+    "/{portfolio_id}/risk",
+    summary="Quantitative risk analytics suite (VaR, CVaR, Sharpe, Drawdown)",
+)
 async def get_portfolio_risk(
     portfolio_id: uuid.UUID,
     current_user: CurrentUser,
@@ -420,7 +429,9 @@ async def get_portfolio_risk(
     # Fetch daily price history for holdings
     tickers = [h.ticker for h in holdings]
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
-    instruments = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+    instruments = {
+        inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()
+    }
 
     daily_prices: dict[str, pd.Series] = {}
     for ticker, inst_id in instruments.items():
@@ -458,12 +469,16 @@ async def get_portfolio_risk(
     return compute_portfolio_analytics(port_returns)
 
 
-@router.post("/{portfolio_id}/optimize", summary="Mean-variance, Max Sharpe, and Risk Parity optimizer")
+@router.post(
+    "/{portfolio_id}/optimize", summary="Mean-variance, Max Sharpe, and Risk Parity optimizer"
+)
 async def optimize_portfolio_endpoint(
     portfolio_id: uuid.UUID,
     current_user: CurrentUser,
     session: SessionDep,
-    objective: Annotated[str, Query(pattern="^(max_sharpe|min_variance|risk_parity)$")] = "max_sharpe",
+    objective: Annotated[
+        str, Query(pattern="^(max_sharpe|min_variance|risk_parity)$")
+    ] = "max_sharpe",
     body: OptimizePortfolioRequest | None = None,
 ) -> dict[str, Any]:
     port = await session.get(Portfolio, portfolio_id)
@@ -537,7 +552,9 @@ async def optimize_portfolio_endpoint(
     )
 
 
-@router.post("/{portfolio_id}/rebalance", summary="Generate rebalance trade orders for target weights")
+@router.post(
+    "/{portfolio_id}/rebalance", summary="Generate rebalance trade orders for target weights"
+)
 async def rebalance_portfolio_endpoint(
     portfolio_id: uuid.UUID,
     body: RebalanceRequest,
@@ -619,10 +636,12 @@ async def get_fama_french_exposure(
     holdings = compute_holdings_fifo(txs)
     tickers = [h.ticker for h in holdings]
     bench_ticker = port.benchmark_ticker or "SPY"
-    all_needed = list(set(tickers + [bench_ticker]))
+    all_needed = list({*tickers, bench_ticker})
 
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(all_needed))
-    instruments = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+    instruments = {
+        inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()
+    }
 
     daily_prices: dict[str, pd.Series] = {}
     for ticker, inst_id in instruments.items():
@@ -638,7 +657,9 @@ async def get_fama_french_exposure(
             daily_prices[ticker] = pd.Series(prices, index=pd.to_datetime(dates))
 
     if not daily_prices or any(t not in daily_prices for t in tickers):
-        raise DataUnavailableError("Insufficient historical price bars to compute factor regression.")
+        raise DataUnavailableError(
+            "Insufficient historical price bars to compute factor regression."
+        )
 
     holding_prices = {t: daily_prices[t] for t in tickers}
     df_prices = pd.DataFrame(holding_prices).dropna()
@@ -673,10 +694,12 @@ async def get_rolling_metrics(
     holdings = compute_holdings_fifo(txs)
     tickers = [h.ticker for h in holdings]
     bench_ticker = port.benchmark_ticker or "SPY"
-    all_needed = list(set(tickers + [bench_ticker]))
+    all_needed = list({*tickers, bench_ticker})
 
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(all_needed))
-    instruments = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
+    instruments = {
+        inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()
+    }
 
     daily_prices: dict[str, pd.Series] = {}
     for ticker, inst_id in instruments.items():
@@ -692,7 +715,9 @@ async def get_rolling_metrics(
             daily_prices[ticker] = pd.Series(prices, index=pd.to_datetime(dates))
 
     if not daily_prices or any(t not in daily_prices for t in tickers):
-        raise DataUnavailableError("Insufficient historical price bars to compute rolling statistics.")
+        raise DataUnavailableError(
+            "Insufficient historical price bars to compute rolling statistics."
+        )
 
     holding_prices = {t: daily_prices[t] for t in tickers}
     df_prices = pd.DataFrame(holding_prices).dropna()
@@ -711,7 +736,10 @@ async def get_rolling_metrics(
     return compute_rolling_statistics(port_returns, bench_returns, window=window)
 
 
-@router.post("/{portfolio_id}/black-litterman", summary="Black-Litterman expected returns and optimal allocation")
+@router.post(
+    "/{portfolio_id}/black-litterman",
+    summary="Black-Litterman expected returns and optimal allocation",
+)
 async def black_litterman_endpoint(
     portfolio_id: uuid.UUID,
     body: BlackLittermanRequest,
@@ -728,7 +756,9 @@ async def black_litterman_endpoint(
     tickers = [h.ticker for h in holdings]
 
     if len(tickers) < 2:
-        raise ValidationFailedError("Black-Litterman model requires at least 2 distinct asset holdings.")
+        raise ValidationFailedError(
+            "Black-Litterman model requires at least 2 distinct asset holdings."
+        )
 
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
     inst_map = {inst.ticker: inst.id for inst in (await session.execute(inst_stmt)).scalars().all()}
@@ -764,7 +794,9 @@ async def black_litterman_endpoint(
     )
 
 
-@router.post("/{portfolio_id}/attribution", summary="Brinson-Fachler sector performance attribution")
+@router.post(
+    "/{portfolio_id}/attribution", summary="Brinson-Fachler sector performance attribution"
+)
 async def sector_attribution_endpoint(
     portfolio_id: uuid.UUID,
     body: AttributionRequest,
@@ -780,13 +812,13 @@ async def sector_attribution_endpoint(
     holdings = compute_holdings_fifo(txs)
     enriched = await enrich_holdings_with_prices(session, holdings)
 
-    start = body.start or (date.today() - timedelta(days=30))
-    end = body.end or date.today()
+    start = body.start or (datetime.now(UTC).date() - timedelta(days=30))
+    end = body.end or datetime.now(UTC).date()
     tickers = [h.ticker for h in holdings]
     inst_stmt = select(Instrument).where(Instrument.ticker.in_(tickers))
     inst_rows = (await session.execute(inst_stmt)).scalars().all()
     sectors = {inst.ticker: inst.sector or "Unclassified" for inst in inst_rows}
-    histories, missing, _ = await load_price_histories(
+    histories, _missing, _ = await load_price_histories(
         session, tickers, base_currency=port.base_currency, start=start, end=end
     )
     return compute_sector_attribution(

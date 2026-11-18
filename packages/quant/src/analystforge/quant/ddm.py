@@ -130,7 +130,8 @@ def multi_stage_ddm(assumptions: MultiStageDDMAssumptions) -> MultiStageDDMResul
     final_year = len(assumptions.stage1_growth)
 
     terminal_value = (
-        final_div * (ONE + assumptions.terminal_growth)
+        final_div
+        * (ONE + assumptions.terminal_growth)
         / (assumptions.cost_of_equity - assumptions.terminal_growth)
     )
     tv_df = discount_factor(assumptions.cost_of_equity, Decimal(final_year))

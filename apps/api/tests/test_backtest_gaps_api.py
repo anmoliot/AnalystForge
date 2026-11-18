@@ -13,6 +13,7 @@ Covers:
 
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -30,11 +31,19 @@ async def _seed_test_prices(db: Database, ticker: str, count: int = 60) -> None:
         ex = await session.get(Exchange, "NASDAQ")
         if not ex:
             session.add(
-                Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD")
+                Exchange(
+                    code="NASDAQ",
+                    name="Nasdaq",
+                    country="US",
+                    timezone="America/New_York",
+                    currency="USD",
+                )
             )
             await session.flush()
 
-        inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+        inst = (
+            await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+        ).scalar_one_or_none()
         if not inst:
             inst = Instrument(
                 id=uuid.uuid4(),
@@ -91,7 +100,9 @@ async def auth_headers(client: httpx.AsyncClient) -> dict[str, str]:
 
 
 @pytest.mark.asyncio
-async def test_rule_builder_backtest(client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database) -> None:
+async def test_rule_builder_backtest(
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
+) -> None:
     await _seed_test_prices(db, "NVDA", count=60)
 
     payload = {
@@ -100,7 +111,11 @@ async def test_rule_builder_backtest(client: httpx.AsyncClient, auth_headers: di
             "combinator": "AND",
             "rules": [
                 {"left": {"name": "RSI", "params": {"period": 14}}, "op": "<", "right": 65.0},
-                {"left": {"name": "CLOSE"}, "op": ">=", "right": {"name": "SMA", "params": {"window": 10}}},
+                {
+                    "left": {"name": "CLOSE"},
+                    "op": ">=",
+                    "right": {"name": "SMA", "params": {"window": 10}},
+                },
             ],
         },
         "initial_capital": 50000.0,
@@ -145,11 +160,15 @@ def generate_signals(df):
         headers=auth_headers,
         json={"ticker": "GOOGL", "code": code_legit, "initial_capital": 80000.0},
     )
-    assert resp_ok.status_code == 200, resp_ok.text
-    data = resp_ok.json()
-    assert data["strategy_name"] == "CUSTOM_PYTHON"
-    assert len(data["equity_curve"]) >= 30
-    assert "survivorship_warning" in data
+    if sys.platform == "win32":
+        assert resp_ok.status_code == 501, resp_ok.text
+        assert "not supported on Windows" in resp_ok.text
+    else:
+        assert resp_ok.status_code == 200, resp_ok.text
+        data = resp_ok.json()
+        assert data["strategy_name"] == "CUSTOM_PYTHON"
+        assert len(data["equity_curve"]) >= 30
+        assert "survivorship_warning" in data
 
     # 2. Malicious attempt: import os
     code_malicious = """
@@ -168,7 +187,9 @@ def generate_signals(df):
 
 
 @pytest.mark.asyncio
-async def test_walk_forward_analysis(client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database) -> None:
+async def test_walk_forward_analysis(
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
+) -> None:
     await _seed_test_prices(db, "TSLA", count=60)
 
     payload = {
@@ -190,7 +211,9 @@ async def test_walk_forward_analysis(client: httpx.AsyncClient, auth_headers: di
 
 
 @pytest.mark.asyncio
-async def test_parameter_sweep(client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database) -> None:
+async def test_parameter_sweep(
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
+) -> None:
     await _seed_test_prices(db, "AMZN", count=60)
 
     payload = {
@@ -214,7 +237,9 @@ async def test_parameter_sweep(client: httpx.AsyncClient, auth_headers: dict[str
 
 
 @pytest.mark.asyncio
-async def test_background_job_lifecycle(client: httpx.AsyncClient, auth_headers: dict[str, str]) -> None:
+async def test_background_job_lifecycle(
+    client: httpx.AsyncClient, auth_headers: dict[str, str]
+) -> None:
     # 1. Spawn background job
     create_resp = await client.post(
         "/api/v1/backtests/jobs",

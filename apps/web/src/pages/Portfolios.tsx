@@ -320,7 +320,7 @@ export default function Portfolios() {
 
         <div className="flex flex-wrap items-center gap-2">
           {portfolios.length > 0 && (
-            <select
+            <select aria-label="Portfolio selection"
               value={activePortId || ""}
               onChange={(e) => setSelectedPortId(e.target.value)}
               className="rounded border border-line bg-elevated px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
@@ -357,7 +357,7 @@ export default function Portfolios() {
         <div className="skeleton h-64 w-full" />
       ) : portfolios.length === 0 ? (
         <Panel className="flex flex-col items-center justify-center py-16 text-center">
-          <FolderOpen className="mb-3 size-12 text-muted/50" />
+          <FolderOpen className="mb-3 size-12 text-muted" />
           <h2 className="text-base font-semibold">No Portfolios Found</h2>
           <p className="mt-1 max-w-md text-xs text-muted">
             Create your first institutional portfolio to track holdings, compute risk metrics (VaR/CVaR), and run
@@ -389,14 +389,14 @@ export default function Portfolios() {
               <div className="flex items-center justify-between text-2xs text-muted">
                 <span>UNREALIZED P&L</span>
                 {totalUnrealizedPnl >= 0 ? (
-                  <ArrowUpRight className="size-3.5 text-emerald-400" />
+                  <ArrowUpRight className="size-3.5 text-accent" />
                 ) : (
-                  <ArrowDownRight className="size-3.5 text-rose-400" />
+                  <ArrowDownRight className="size-3.5 text-negative" />
                 )}
               </div>
               <div
                 className={`text-xl font-bold font-mono ${
-                  totalUnrealizedPnl >= 0 ? "text-emerald-400" : "text-rose-400"
+                  totalUnrealizedPnl >= 0 ? "text-accent" : "text-negative"
                 }`}
               >
                 {totalUnrealizedPnl >= 0 ? "+" : ""}${formatNumber(totalUnrealizedPnl, 2)}
@@ -410,14 +410,14 @@ export default function Portfolios() {
             <Panel className="space-y-1 p-3">
               <div className="flex items-center justify-between text-2xs text-muted">
                 <span>ANNUALIZED VOLATILITY</span>
-                <Activity className="size-3.5 text-amber-400" />
+                <Activity className="size-3.5 text-warning" />
               </div>
               <div className="text-xl font-bold font-mono">
                 {riskMetrics ? formatPercent(riskMetrics.volatility, 2) : "—"}
               </div>
               <div className="text-2xs text-muted">
                 Max Drawdown:{" "}
-                <span className="font-mono text-rose-400">
+                <span className="font-mono text-negative">
                   {riskMetrics ? formatPercent(riskMetrics.max_drawdown, 2) : "—"}
                 </span>
               </div>
@@ -426,7 +426,7 @@ export default function Portfolios() {
             <Panel className="space-y-1 p-3">
               <div className="flex items-center justify-between text-2xs text-muted">
                 <span>SHARPE / SORTINO</span>
-                <TrendingUp className="size-3.5 text-emerald-400" />
+                <TrendingUp className="size-3.5 text-accent" />
               </div>
               <div className="text-xl font-bold font-mono">
                 {riskMetrics?.sharpe !== null && riskMetrics?.sharpe !== undefined
@@ -438,7 +438,7 @@ export default function Portfolios() {
               </div>
               <div className="text-2xs text-muted">
                 VaR (95% Hist):{" "}
-                <span className="font-mono text-amber-400">
+                <span className="font-mono text-warning">
                   {riskMetrics ? formatPercent(riskMetrics.var_95_hist, 2) : "—"}
                 </span>
               </div>
@@ -588,7 +588,7 @@ export default function Portfolios() {
                             </td>
                             <td
                               className={`px-3.5 py-2.5 text-right font-mono ${
-                                pnl >= 0 ? "text-emerald-400" : "text-rose-400"
+                                pnl >= 0 ? "text-accent" : "text-negative"
                               }`}
                             >
                               {pnl >= 0 ? "+" : ""}${formatNumber(pnl, 2)} (
@@ -690,10 +690,10 @@ export default function Portfolios() {
                           <td className="px-3.5 py-2.5 font-mono text-2xs text-muted">
                             {sc.start} → {sc.end}
                           </td>
-                          <td className="px-3.5 py-2.5 text-right font-mono text-rose-400 font-semibold">
+                          <td className="px-3.5 py-2.5 text-right font-mono text-negative font-semibold">
                             {formatPercent(sc.shock_pct, 1)}
                           </td>
-                          <td className="px-3.5 py-2.5 text-right font-mono text-rose-400">
+                          <td className="px-3.5 py-2.5 text-right font-mono text-negative">
                             ${formatNumber(sc.projected_loss, 2)}
                           </td>
                           <td className="px-3.5 py-2.5 text-right font-mono font-medium">
@@ -710,11 +710,11 @@ export default function Portfolios() {
               </Panel>
 
               {riskError && (
-                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-start gap-2" data-testid="risk-data-unavailable">
-                  <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-warning flex items-start gap-2" data-testid="risk-data-unavailable">
+                  <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
                   <div>
-                    <p className="font-semibold text-amber-200">Risk Analytics Unavailable</p>
-                    <p className="mt-0.5 text-amber-300/80">
+                    <p className="font-semibold text-warning">Risk Analytics Unavailable</p>
+                    <p className="mt-0.5 text-warning/80">
                       {riskError instanceof Error ? riskError.message : "Insufficient price history for portfolio holdings."}
                     </p>
                   </div>
@@ -742,7 +742,7 @@ export default function Portfolios() {
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Conditional VaR (CVaR / Expected Shortfall):</span>
-                      <span className="font-mono font-medium text-rose-400">
+                      <span className="font-mono font-medium text-negative">
                         {riskMetrics ? formatPercent(riskMetrics.cvar_95, 3) : "—"}
                       </span>
                     </div>
@@ -756,19 +756,19 @@ export default function Portfolios() {
                   <div className="space-y-2 pt-2">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Annualized Sharpe Ratio:</span>
-                      <span className="font-mono font-medium text-emerald-400">
+                      <span className="font-mono font-medium text-accent">
                         {riskMetrics?.sharpe ? formatNumber(riskMetrics.sharpe, 2) : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Sortino Ratio (MAR=0%):</span>
-                      <span className="font-mono font-medium text-emerald-400">
+                      <span className="font-mono font-medium text-accent">
                         {riskMetrics?.sortino ? formatNumber(riskMetrics.sortino, 2) : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Peak-to-Trough Max Drawdown:</span>
-                      <span className="font-mono font-medium text-rose-400">
+                      <span className="font-mono font-medium text-negative">
                         {riskMetrics ? formatPercent(riskMetrics.max_drawdown, 2) : "—"}
                       </span>
                     </div>
@@ -796,7 +796,7 @@ export default function Portfolios() {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-muted font-medium">Objective:</span>
-                      <select
+                      <select aria-label="Portfolio selection"
                         value={optimizeObj}
                         onChange={(e) => setOptimizeObj(e.target.value as "max_sharpe" | "min_variance")}
                         className="rounded border border-line bg-elevated px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none"
@@ -824,11 +824,11 @@ export default function Portfolios() {
                 {optimizing ? (
                   <div className="skeleton h-48 w-full" />
                 ) : optError ? (
-                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-start gap-2" data-testid="optimizer-data-unavailable">
-                    <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-warning flex items-start gap-2" data-testid="optimizer-data-unavailable">
+                    <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
                     <div>
-                      <p className="font-semibold text-amber-200">Data Unavailable for Optimization</p>
-                      <p className="mt-0.5 text-amber-300/80">
+                      <p className="font-semibold text-warning">Data Unavailable for Optimization</p>
+                      <p className="mt-0.5 text-warning/80">
                         {optError instanceof Error ? optError.message : "Insufficient aligned price history for portfolio holdings."}
                       </p>
                     </div>
@@ -867,7 +867,7 @@ export default function Portfolios() {
                                   </td>
                                   <td
                                     className={`px-3 py-2 text-right font-mono ${
-                                      delta >= 0 ? "text-emerald-400" : "text-rose-400"
+                                      delta >= 0 ? "text-accent" : "text-negative"
                                     }`}
                                   >
                                     {delta >= 0 ? "+" : ""}
@@ -888,13 +888,13 @@ export default function Portfolios() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs">
                           <span className="text-muted">Expected Annual Return:</span>
-                          <span className="font-mono font-medium text-emerald-400">
+                          <span className="font-mono font-medium text-accent">
                             {optResult.expected_return ? formatPercent(optResult.expected_return, 2) : "—"}
                           </span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-muted">Expected Volatility:</span>
-                          <span className="font-mono font-medium text-amber-400">
+                          <span className="font-mono font-medium text-warning">
                             {optResult.expected_volatility ? formatPercent(optResult.expected_volatility, 2) : "—"}
                           </span>
                         </div>
@@ -944,7 +944,7 @@ export default function Portfolios() {
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-2xs font-medium uppercase text-muted">Additional Cash ($)</label>
-                    <input
+                    <input aria-label="Additional Cash ($)"
                       type="number"
                       step="100"
                       value={rebalanceCash}
@@ -954,7 +954,7 @@ export default function Portfolios() {
                   </div>
                   <div>
                     <label className="mb-1 block text-2xs font-medium uppercase text-muted">Commission (bps)</label>
-                    <input
+                    <input aria-label="Commission (bps)"
                       type="number"
                       min="0"
                       value={rebalanceCommissionBps}
@@ -988,7 +988,10 @@ export default function Portfolios() {
                             <span className="text-2xs text-muted">Current: {formatPercent(currW, 1)}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <input
+                            <input aria-label="setAllowFractional(e.target.checked)}
+                        className=&quot;rounded border-line bg-elevated text-accent&quot;
+                      />
+                      Allow Fractional Shares"
                               type="number"
                               step="0.01"
                               min="0"
@@ -1012,7 +1015,7 @@ export default function Portfolios() {
                 </div>
 
                 {rebalanceMutation.isError && (
-                  <div className="rounded border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400">
+                  <div className="rounded border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-negative">
                     {rebalanceMutation.error instanceof Error
                       ? rebalanceMutation.error.message
                       : "Failed to generate rebalance plan."}
@@ -1036,13 +1039,13 @@ export default function Portfolios() {
                       </div>
                       <div className="rounded border border-line bg-elevated/50 p-2.5">
                         <span className="text-2xs text-muted uppercase block">Est. Commission</span>
-                        <span className="text-base font-bold font-mono text-amber-400">
+                        <span className="text-base font-bold font-mono text-warning">
                           ${formatNumber(rebalanceMutation.data.total_estimated_commissions, 2)}
                         </span>
                       </div>
                       <div className="rounded border border-line bg-elevated/50 p-2.5">
                         <span className="text-2xs text-muted uppercase block">Ending Cash</span>
-                        <span className="text-base font-bold font-mono text-emerald-400">
+                        <span className="text-base font-bold font-mono text-accent">
                           ${formatNumber(rebalanceMutation.data.ending_cash, 2)}
                         </span>
                       </div>
@@ -1084,9 +1087,9 @@ export default function Portfolios() {
                               <td
                                 className={`px-3 py-2 text-right font-mono font-bold ${
                                   o.delta_shares > 0
-                                    ? "text-emerald-400"
+                                    ? "text-accent"
                                     : o.delta_shares < 0
-                                    ? "text-rose-400"
+                                    ? "text-negative"
                                     : "text-muted"
                                 }`}
                               >
@@ -1132,11 +1135,11 @@ export default function Portfolios() {
                 {loadingFactors ? (
                   <div className="skeleton h-48 w-full" />
                 ) : factorsError ? (
-                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-start gap-2">
-                    <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-warning flex items-start gap-2">
+                    <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
                     <div>
-                      <p className="font-semibold text-amber-200">Factor Regression Unavailable</p>
-                      <p className="mt-0.5 text-amber-300/80">
+                      <p className="font-semibold text-warning">Factor Regression Unavailable</p>
+                      <p className="mt-0.5 text-warning/80">
                         {factorsError instanceof Error ? factorsError.message : "Insufficient historical returns."}
                       </p>
                     </div>
@@ -1148,7 +1151,7 @@ export default function Portfolios() {
                         <span className="text-2xs text-muted uppercase block">Annualized Jensen's Alpha</span>
                         <span
                           className={`text-lg font-bold font-mono ${
-                            factorsData.alpha_annualized >= 0 ? "text-emerald-400" : "text-rose-400"
+                            factorsData.alpha_annualized >= 0 ? "text-accent" : "text-negative"
                           }`}
                         >
                           {factorsData.alpha_annualized >= 0 ? "+" : ""}
@@ -1160,7 +1163,7 @@ export default function Portfolios() {
                       </div>
                       <div className="rounded border border-line bg-elevated/50 p-3">
                         <span className="text-2xs text-muted uppercase block">Residual Volatility</span>
-                        <span className="text-lg font-bold font-mono text-amber-400">
+                        <span className="text-lg font-bold font-mono text-warning">
                           {formatPercent(factorsData.residual_volatility, 2)}
                         </span>
                         <span className="text-2xs text-muted block mt-1">Idiosyncratic Risk</span>
@@ -1232,7 +1235,7 @@ export default function Portfolios() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-2xs text-muted uppercase">Window:</span>
-                    <select
+                    <select aria-label="Portfolio selection"
                       value={rollingWindow}
                       onChange={(e) => setRollingWindow(Number(e.target.value))}
                       className="rounded border border-line bg-elevated px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none font-mono"
@@ -1248,11 +1251,11 @@ export default function Portfolios() {
                 {loadingRolling ? (
                   <div className="skeleton h-48 w-full" />
                 ) : rollingError ? (
-                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-start gap-2">
-                    <AlertTriangle className="size-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-warning flex items-start gap-2">
+                    <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
                     <div>
-                      <p className="font-semibold text-amber-200">Rolling Metrics Unavailable</p>
-                      <p className="mt-0.5 text-amber-300/80">
+                      <p className="font-semibold text-warning">Rolling Metrics Unavailable</p>
+                      <p className="mt-0.5 text-warning/80">
                         {rollingError instanceof Error ? rollingError.message : "Insufficient historical returns."}
                       </p>
                     </div>
@@ -1263,13 +1266,13 @@ export default function Portfolios() {
                     <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                       <div className="rounded border border-line bg-elevated/40 p-2.5">
                         <span className="text-2xs text-muted uppercase block">Latest Volatility</span>
-                        <span className="text-sm font-bold font-mono text-amber-400">
+                        <span className="text-sm font-bold font-mono text-warning">
                           {formatPercent(rollingData.rolling_volatility[rollingData.rolling_volatility.length - 1] ?? 0, 1)}
                         </span>
                       </div>
                       <div className="rounded border border-line bg-elevated/40 p-2.5">
                         <span className="text-2xs text-muted uppercase block">Latest Sharpe</span>
-                        <span className="text-sm font-bold font-mono text-emerald-400">
+                        <span className="text-sm font-bold font-mono text-accent">
                           {formatNumber(rollingData.rolling_sharpe[rollingData.rolling_sharpe.length - 1] ?? 0, 2)}
                         </span>
                       </div>
@@ -1293,7 +1296,7 @@ export default function Portfolios() {
                       </div>
                       <div className="rounded border border-line bg-elevated/40 p-2.5">
                         <span className="text-2xs text-muted uppercase block">Max Drawdown</span>
-                        <span className="text-sm font-bold font-mono text-rose-400">
+                        <span className="text-sm font-bold font-mono text-negative">
                           {formatPercent(rollingData.rolling_max_drawdown[rollingData.rolling_max_drawdown.length - 1] ?? 0, 1)}
                         </span>
                       </div>
@@ -1322,10 +1325,10 @@ export default function Portfolios() {
                               return (
                                 <tr key={dateStr} className="hover:bg-elevated/30">
                                   <td className="px-3 py-1.5 font-mono text-ink">{dateStr}</td>
-                                  <td className="px-3 py-1.5 text-right font-mono text-amber-400">
+                                  <td className="px-3 py-1.5 text-right font-mono text-warning">
                                     {formatPercent(rollingData.rolling_volatility[origIdx] ?? 0, 1)}
                                   </td>
-                                  <td className="px-3 py-1.5 text-right font-mono text-emerald-400">
+                                  <td className="px-3 py-1.5 text-right font-mono text-accent">
                                     {formatNumber(rollingData.rolling_sharpe[origIdx] ?? 0, 2)}
                                   </td>
                                   <td className="px-3 py-1.5 text-right font-mono text-accent">
@@ -1337,7 +1340,7 @@ export default function Portfolios() {
                                   <td className="px-3 py-1.5 text-right font-mono">
                                     {formatNumber(rollingData.rolling_information_ratio[origIdx] ?? 0, 2)}
                                   </td>
-                                  <td className="px-3 py-1.5 text-right font-mono text-rose-400">
+                                  <td className="px-3 py-1.5 text-right font-mono text-negative">
                                     {formatPercent(rollingData.rolling_max_drawdown[origIdx] ?? 0, 1)}
                                   </td>
                                 </tr>
@@ -1366,7 +1369,7 @@ export default function Portfolios() {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="mb-1 block text-2xs font-medium uppercase text-muted">Portfolio Name</label>
-                <input
+                <input aria-label="Portfolio Name"
                   type="text"
                   value={newPortName}
                   onChange={(e) => setNewPortName(e.target.value)}
@@ -1378,7 +1381,7 @@ export default function Portfolios() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Base Currency</label>
-                  <select
+                  <select aria-label="Base Currency"
                     value={newPortCurrency}
                     onChange={(e) => setNewPortCurrency(e.target.value)}
                     className="w-full rounded border border-line bg-elevated px-2.5 py-2 text-ink focus:border-accent focus:outline-none"
@@ -1391,7 +1394,7 @@ export default function Portfolios() {
 
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Benchmark</label>
-                  <input
+                  <input aria-label="Benchmark"
                     type="text"
                     value={newPortBenchmark}
                     onChange={(e) => setNewPortBenchmark(e.target.value)}
@@ -1402,7 +1405,7 @@ export default function Portfolios() {
 
               <div>
                 <label className="mb-1 block text-2xs font-medium uppercase text-muted">Cost Basis Method</label>
-                <select
+                <select aria-label="Cost Basis Method"
                   value={newPortMethod}
                   onChange={(e) => setNewPortMethod(e.target.value)}
                   className="w-full rounded border border-line bg-elevated px-2.5 py-2 text-ink focus:border-accent focus:outline-none"
@@ -1438,7 +1441,7 @@ export default function Portfolios() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Type</label>
-                  <select
+                  <select aria-label="Type"
                     value={txType}
                     onChange={(e) => setTxType(e.target.value as "BUY" | "SELL")}
                     className="w-full rounded border border-line bg-elevated px-2.5 py-2 text-ink focus:border-accent focus:outline-none"
@@ -1449,7 +1452,7 @@ export default function Portfolios() {
                 </div>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Ticker</label>
-                  <input
+                  <input aria-label="Ticker"
                     type="text"
                     value={txTicker}
                     onChange={(e) => setTxTicker(e.target.value.toUpperCase())}
@@ -1461,7 +1464,7 @@ export default function Portfolios() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Shares</label>
-                  <input
+                  <input aria-label="Shares"
                     type="number"
                     min="1"
                     value={txShares}
@@ -1471,7 +1474,7 @@ export default function Portfolios() {
                 </div>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Price ($)</label>
-                  <input
+                  <input aria-label="Price ($)"
                     type="number"
                     step="0.01"
                     value={txPrice}
@@ -1484,7 +1487,7 @@ export default function Portfolios() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Trade Date</label>
-                  <input
+                  <input aria-label="Trade Date"
                     type="date"
                     value={txDate}
                     onChange={(e) => setTxDate(e.target.value)}
@@ -1493,7 +1496,7 @@ export default function Portfolios() {
                 </div>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Commission ($)</label>
-                  <input
+                  <input aria-label="Commission ($)"
                     type="number"
                     step="0.01"
                     value={txCommission}
@@ -1531,7 +1534,7 @@ export default function Portfolios() {
             </div>
 
             {importError && (
-              <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-400">
+              <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-negative">
                 {importError}
               </div>
             )}
@@ -1539,9 +1542,9 @@ export default function Portfolios() {
             {/* If validation report was generated */}
             {importValidationReport ? (
               <div className="space-y-4 py-2">
-                <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-300">
-                  <div className="flex items-center gap-2 mb-1 font-semibold text-emerald-200">
-                    <CheckCircle2 className="size-4 text-emerald-400" />
+                <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-accent">
+                  <div className="flex items-center gap-2 mb-1 font-semibold text-accent">
+                    <CheckCircle2 className="size-4 text-accent" />
                     Import Execution Complete
                   </div>
                   <p>
@@ -1552,7 +1555,7 @@ export default function Portfolios() {
                     transactions.
                   </p>
                   {Number(importValidationReport.error_rows ?? 0) > 0 && (
-                    <p className="text-rose-400 mt-1">
+                    <p className="text-negative mt-1">
                       {String(importValidationReport.error_rows)} rows encountered errors and were rejected.
                     </p>
                   )}
@@ -1583,7 +1586,7 @@ export default function Portfolios() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Select File (.csv, .xlsx, .xls)</label>
-                  <input
+                  <input aria-label="Select File (.csv, .xlsx, .xls)"
                     type="file"
                     accept=".csv,.xlsx,.xls"
                     onChange={(e) => {
@@ -1683,11 +1686,11 @@ export default function Portfolios() {
                       <div key={col.key} className="rounded border border-line bg-elevated/40 p-2 text-xs">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-ink">
-                            {col.label} {col.required && <span className="text-rose-400">*</span>}
+                            {col.label} {col.required && <span className="text-negative">*</span>}
                           </span>
                           <span className="text-2xs font-mono text-muted">{col.key}</span>
                         </div>
-                        <select
+                        <select aria-label="Portfolio selection"
                           value={columnMapping[col.key] ?? ""}
                           onChange={(e) =>
                             setColumnMapping({

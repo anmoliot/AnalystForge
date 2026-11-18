@@ -1,6 +1,7 @@
 """Tests for Report Generation and Download API (Phase 10)."""
 
 import uuid
+
 import pytest
 from httpx import AsyncClient
 

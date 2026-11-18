@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+
 import httpx
 import pytest
 
@@ -14,7 +15,7 @@ from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
 
 async def _seed_macro_data(db: Database) -> None:
     async with db.session() as session:
-        today = date.today()
+        today = datetime.now(UTC).date()
         series_info = [
             ("DGS10", "10-Year Treasury Constant Maturity Rate", "%", "Daily"),
             ("DGS2", "2-Year Treasury Constant Maturity Rate", "%", "Daily"),
@@ -30,14 +31,25 @@ async def _seed_macro_data(db: Database) -> None:
             ("GDPC1", "Real Gross Domestic Product", "Bil. Chn. 2017 $", "Quarterly"),
         ]
         rates = {
-            "DGS10": 4.35, "DGS2": 4.22, "DGS1MO": 4.60, "DGS3MO": 4.55,
-            "DGS6MO": 4.45, "DGS1": 4.30, "DGS5": 4.18, "DGS30": 4.55,
-            "FEDFUNDS": 4.83, "CPIAUCSL": 315.2, "UNRATE": 4.1, "GDPC1": 22850.0,
+            "DGS10": 4.35,
+            "DGS2": 4.22,
+            "DGS1MO": 4.60,
+            "DGS3MO": 4.55,
+            "DGS6MO": 4.45,
+            "DGS1": 4.30,
+            "DGS5": 4.18,
+            "DGS30": 4.55,
+            "FEDFUNDS": 4.83,
+            "CPIAUCSL": 315.2,
+            "UNRATE": 4.1,
+            "GDPC1": 22850.0,
         }
         for code, title, units, freq in series_info:
             s = await session.get(MacroSeries, code)
             if not s:
-                s = MacroSeries(code=code, title=title, units=units, frequency=freq, provider="FRED")
+                s = MacroSeries(
+                    code=code, title=title, units=units, frequency=freq, provider="FRED"
+                )
                 session.add(s)
                 await session.flush()
 
@@ -53,7 +65,11 @@ async def _seed_macro_data(db: Database) -> None:
                 session.add(obs)
 
         # FX pairs
-        fx_pairs = [("EUR", "USD", Decimal("1.085")), ("GBP", "USD", Decimal("1.295")), ("USD", "JPY", Decimal("154.2"))]
+        fx_pairs = [
+            ("EUR", "USD", Decimal("1.085")),
+            ("GBP", "USD", Decimal("1.295")),
+            ("USD", "JPY", Decimal("154.2")),
+        ]
         for b, q, r in fx_pairs:
             session.add(FxRate(base=b, quote=q, day=today, rate=r, provider="ecb"))
 
@@ -114,9 +130,7 @@ async def test_screener_execution_and_saved_preset(
     assert any(p["id"] == preset_id for p in presets)
 
     # 4. Delete saved preset
-    del_resp = await client.delete(
-        f"/api/v1/screener/saved/{preset_id}", headers=auth_headers
-    )
+    del_resp = await client.delete(f"/api/v1/screener/saved/{preset_id}", headers=auth_headers)
     assert del_resp.status_code == 204
 
 
@@ -172,7 +186,5 @@ async def test_alert_rules_lifecycle(
     assert isinstance(events_resp.json(), list)
 
     # 4. Delete alert rule
-    del_resp = await client.delete(
-        f"/api/v1/alerts/rules/{rule_id}", headers=auth_headers
-    )
+    del_resp = await client.delete(f"/api/v1/alerts/rules/{rule_id}", headers=auth_headers)
     assert del_resp.status_code == 204

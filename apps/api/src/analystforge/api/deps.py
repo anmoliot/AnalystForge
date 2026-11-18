@@ -7,10 +7,9 @@ from collections.abc import AsyncIterator
 from enum import StrEnum
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, Request
-import jwt
+from fastapi import Depends, Header, Request
 from jwt.exceptions import PyJWTError
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.auth import decode_access_token, hash_api_key
@@ -51,6 +50,17 @@ def get_settings(request: Request) -> Settings:
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     db: Database = request.app.state.db
     async with db.session() as session:
+        if request.method == "POST":
+
+            def track_created(sync_session, context):  # type: ignore[no-untyped-def]
+                if getattr(request.state, "entity_id", None) is None:
+                    for obj in sync_session.new:
+                        if isinstance(getattr(obj, "id", None), uuid.UUID):
+                            request.state.entity_id = str(obj.id)
+                            request.state.entity_type = obj.__tablename__
+                            break
+
+            event.listen(session.sync_session, "after_flush", track_created)
         yield session
 
 
@@ -96,6 +106,7 @@ async def _user_from_bearer(
         user = user_result.scalar_one_or_none()
         if user is None or not user.is_active:
             return None
+        request.state.api_key_id = api_key.id
         return user
 
     # JWT access token
@@ -123,7 +134,7 @@ async def get_current_user(
     settings: SettingsDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> User:
-    user = await _user_from_bearer(request, authorization, session, settings)
+    user = await get_current_user_optional(request, session, settings, authorization)
     if user is None:
         raise AuthenticationError("Authentication required.")
     return user
@@ -138,7 +149,13 @@ async def get_current_user_optional(
     settings: SettingsDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> User | None:
-    return await _user_from_bearer(request, authorization, session, settings)
+    if not hasattr(request.state, "authenticated_user"):
+        user = await _user_from_bearer(request, authorization, session, settings)
+        request.state.authenticated_user = user
+        if user is not None:
+            request.state.actor_id = user.id
+            request.state.tenant_id = user.tenant_id
+    return request.state.authenticated_user
 
 
 CurrentUserOptional = Annotated[User | None, Depends(get_current_user_optional)]

@@ -8,16 +8,15 @@ import io
 import uuid
 import zipfile
 from unittest.mock import MagicMock, patch
+
 import pytest
+import respx
 from httpx import AsyncClient
-from starlette.testclient import TestClient
 
 from analystforge.api.services.reports import (
-    SUPPORTED_FORMATS,
+    generate_excel_report,
     generate_pdf_report,
     generate_pptx_report,
-    generate_excel_report,
-    build_report_file,
 )
 from analystforge_sdk.client import AnalystForgeClient, AnalystForgeError
 
@@ -180,8 +179,6 @@ async def test_report_email_delivery_with_attachment(
         assert mock_instance.send_message.called
 
 
-import respx
-
 @respx.mock
 def test_sdk_integration_with_fastapi():
     """Exit criteria: SDK integration test passes against running API."""
@@ -195,7 +192,12 @@ def test_sdk_integration_with_fastapi():
     # Mock 422 error on unsupported format (registered before generic POST)
     respx.post("http://mock-api/api/v1/reports/generate", json__format="UNSUPPORTED_TYPE").respond(
         422,
-        json={"error": {"code": "unsupported_format", "message": "Unsupported format 'UNSUPPORTED_TYPE'"}},
+        json={
+            "error": {
+                "code": "unsupported_format",
+                "message": "Unsupported format 'UNSUPPORTED_TYPE'",
+            }
+        },
     )
 
     # Mock report generation
@@ -213,7 +215,9 @@ def test_sdk_integration_with_fastapi():
     respx.get("http://mock-api/api/v1/reports/rep_msft_001/download?format=EXCEL").respond(
         200,
         content=b"PK\x03\x04 sample xlsx binary data",
-        headers={"Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        headers={
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        },
     )
 
     with AnalystForgeClient(base_url="http://mock-api", api_key="af_test_key") as sdk_client:

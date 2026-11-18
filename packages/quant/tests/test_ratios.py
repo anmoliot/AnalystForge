@@ -120,9 +120,7 @@ def test_reference_efficiency_ratios(reference) -> None:
     assert ratios["days_inventory_outstanding"].value == pytest.approx(45.625)
     assert ratios["payables_turnover"].value == pytest.approx(600 / 55)
     assert ratios["days_payable_outstanding"].value == pytest.approx(365 * 55 / 600)
-    assert ratios["cash_conversion_cycle"].value == pytest.approx(
-        40.15 + 45.625 - 365 * 55 / 600
-    )
+    assert ratios["cash_conversion_cycle"].value == pytest.approx(40.15 + 45.625 - 365 * 55 / 600)
     assert ratios["days_sales_outstanding"].unit is RatioUnit.DAYS
 
 
@@ -260,7 +258,9 @@ def test_eps_falls_back_to_diluted_shares_then_outstanding_shares(reference) -> 
     derived = _without_income(reference.current, LineItem.EPS_DILUTED)
     ratios = compute_ratios(derived, reference.market, reference.prior)
     assert ratios["eps_diluted"].value == D("1.44")
-    assert ratios["eps_diluted"].note == "Derived from net income and weighted-average diluted shares."
+    assert (
+        ratios["eps_diluted"].note == "Derived from net income and weighted-average diluted shares."
+    )
 
     fallback = _without_income(
         reference.current,

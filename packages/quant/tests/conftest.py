@@ -9,10 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from quant_fixtures import make_statements, reference_market
 
 from analystforge.quant.ratios import MarketData
 from analystforge.quant.statements import FinancialStatements
-from quant_fixtures import make_statements, reference_market
 
 
 @dataclass(frozen=True)

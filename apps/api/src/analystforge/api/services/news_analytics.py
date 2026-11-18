@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -10,7 +11,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import structlog
-from sqlalchemy import case, desc, func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.models.market import Instrument, PriceBar
@@ -44,10 +45,13 @@ def extract_article_content(html_or_text: str) -> str | None:
             if extracted and len(extracted.strip()) > 40:
                 return extracted.strip()
         except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             logger.debug("trafilatura.failed", error=str(exc))
 
         # Basic HTML strip fallback
-        clean = re.sub(r"<script[^>]*>.*?</script>", "", html_or_text, flags=re.DOTALL | re.IGNORECASE)
+        clean = re.sub(
+            r"<script[^>]*>.*?</script>", "", html_or_text, flags=re.DOTALL | re.IGNORECASE
+        )
         clean = re.sub(r"<style[^>]*>.*?</style>", "", clean, flags=re.DOTALL | re.IGNORECASE)
         clean = re.sub(r"<[^>]+>", " ", clean)
         clean = re.sub(r"\s+", " ", clean).strip()
@@ -73,14 +77,16 @@ def normalize_url(url: str) -> str:
     }
     normalized_query = urlencode(filtered_qs, doseq=True)
     clean_path = parsed.path.rstrip("/")
-    return urlunparse((
-        parsed.scheme.lower(),
-        parsed.netloc.lower(),
-        clean_path,
-        parsed.params,
-        normalized_query,
-        "",  # Strip fragment
-    ))
+    return urlunparse(
+        (
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
+            clean_path,
+            parsed.params,
+            normalized_query,
+            "",  # Strip fragment
+        )
+    )
 
 
 def content_hash(text: str) -> str:
@@ -178,25 +184,118 @@ def tag_instruments_in_text(text: str, instruments: list[Instrument]) -> list[uu
 
 # Loughran-McDonald inspired financial dictionary
 _FINANCIAL_POSITIVE = {
-    "gain", "gains", "profit", "profits", "profitable", "beat", "beats", "beating",
-    "surge", "surges", "surging", "growth", "growing", "outperform", "outperformed",
-    "dividend", "dividends", "upgrade", "upgrades", "upgraded", "rally", "rallies",
-    "expansion", "bullish", "record", "strong", "stronger", "upside", "upswing",
-    "rebound", "recovery", "positive", "exceeded", "exceeds", "solid", "milestone",
-    "breakthrough", "momentum", "soar", "soared", "soaring", "gainers", "top-line",
+    "gain",
+    "gains",
+    "profit",
+    "profits",
+    "profitable",
+    "beat",
+    "beats",
+    "beating",
+    "surge",
+    "surges",
+    "surging",
+    "growth",
+    "growing",
+    "outperform",
+    "outperformed",
+    "dividend",
+    "dividends",
+    "upgrade",
+    "upgrades",
+    "upgraded",
+    "rally",
+    "rallies",
+    "expansion",
+    "bullish",
+    "record",
+    "strong",
+    "stronger",
+    "upside",
+    "upswing",
+    "rebound",
+    "recovery",
+    "positive",
+    "exceeded",
+    "exceeds",
+    "solid",
+    "milestone",
+    "breakthrough",
+    "momentum",
+    "soar",
+    "soared",
+    "soaring",
+    "gainers",
+    "top-line",
 }
 
 _FINANCIAL_NEGATIVE = {
-    "loss", "losses", "decline", "declines", "declining", "plunge", "plunges", "plunging",
-    "deficit", "downgrade", "downgrades", "downgraded", "litigation", "lawsuit", "lawsuits",
-    "impairment", "risk", "risks", "fall", "falls", "falling", "miss", "misses", "missing",
-    "slump", "slumps", "drop", "drops", "dropping", "bankruptcy", "warning", "warnings",
-    "debt", "default", "defaults", "fraud", "weak", "weaker", "headwinds", "pressure",
-    "probe", "investigation", "recession", "contraction", "subpoena", "penalty", "penalties",
-    "bearish", "layoffs", "downside", "insolvency", "writedown", "fell",
+    "loss",
+    "losses",
+    "decline",
+    "declines",
+    "declining",
+    "plunge",
+    "plunges",
+    "plunging",
+    "deficit",
+    "downgrade",
+    "downgrades",
+    "downgraded",
+    "litigation",
+    "lawsuit",
+    "lawsuits",
+    "impairment",
+    "risk",
+    "risks",
+    "fall",
+    "falls",
+    "falling",
+    "miss",
+    "misses",
+    "missing",
+    "slump",
+    "slumps",
+    "drop",
+    "drops",
+    "dropping",
+    "bankruptcy",
+    "warning",
+    "warnings",
+    "debt",
+    "default",
+    "defaults",
+    "fraud",
+    "weak",
+    "weaker",
+    "headwinds",
+    "pressure",
+    "probe",
+    "investigation",
+    "recession",
+    "contraction",
+    "subpoena",
+    "penalty",
+    "penalties",
+    "bearish",
+    "layoffs",
+    "downside",
+    "insolvency",
+    "writedown",
+    "fell",
 }
 
-_NEGATION_WORDS = {"not", "no", "never", "without", "failed", "fails", "failing", "hardly", "barely"}
+_NEGATION_WORDS = {
+    "not",
+    "no",
+    "never",
+    "without",
+    "failed",
+    "fails",
+    "failing",
+    "hardly",
+    "barely",
+}
 
 
 def analyze_sentiment(text: str) -> dict[str, Any]:
@@ -229,9 +328,14 @@ def analyze_sentiment(text: str) -> dict[str, Any]:
             "label": label,
             "confidence": round(conf, 4),
             "backend": "finbert",
-            "probabilities": {"positive": round(pos, 4), "neutral": round(neu, 4), "negative": round(neg, 4)},
+            "probabilities": {
+                "positive": round(pos, 4),
+                "neutral": round(neu, 4),
+                "negative": round(neg, 4),
+            },
         }
-    except Exception:
+    except Exception as exc:
+        logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
         # Lexical financial fallback (Loughran-McDonald rules)
         pass
 
@@ -249,8 +353,7 @@ def analyze_sentiment(text: str) -> dict[str, Any]:
     neg_count = 0
     for idx, w in enumerate(words):
         is_negated = any(
-            words[max(0, idx - k)] in _NEGATION_WORDS
-            for k in range(1, min(4, idx + 1))
+            words[max(0, idx - k)] in _NEGATION_WORDS for k in range(1, min(4, idx + 1))
         )
         if w in _FINANCIAL_POSITIVE:
             if is_negated:
@@ -299,28 +402,95 @@ def analyze_sentiment(text: str) -> dict[str, Any]:
 
 TOPIC_RULES = {
     "Earnings & Financial Results": {
-        "earnings", "revenue", "profit", "eps", "quarter", "quarterly", "fiscal", "guidance",
-        "ebitda", "net income", "sales", "margins", "operating profit", "cash flow",
+        "earnings",
+        "revenue",
+        "profit",
+        "eps",
+        "quarter",
+        "quarterly",
+        "fiscal",
+        "guidance",
+        "ebitda",
+        "net income",
+        "sales",
+        "margins",
+        "operating profit",
+        "cash flow",
     },
     "Mergers & Acquisitions": {
-        "merger", "acquisition", "takeover", "acquire", "acquired", "buyout", "deal",
-        "transaction", "tender offer", "spin-off", "divestiture", "purchase",
+        "merger",
+        "acquisition",
+        "takeover",
+        "acquire",
+        "acquired",
+        "buyout",
+        "deal",
+        "transaction",
+        "tender offer",
+        "spin-off",
+        "divestiture",
+        "purchase",
     },
     "Macroeconomics & Monetary Policy": {
-        "inflation", "interest rate", "rates", "federal reserve", "fed", "ecb", "yield",
-        "treasury", "central bank", "monetary policy", "gdp", "cpi", "unemployment", "recession",
+        "inflation",
+        "interest rate",
+        "rates",
+        "federal reserve",
+        "fed",
+        "ecb",
+        "yield",
+        "treasury",
+        "central bank",
+        "monetary policy",
+        "gdp",
+        "cpi",
+        "unemployment",
+        "recession",
     },
     "Regulatory, Legal & Governance": {
-        "sec", "lawsuit", "antitrust", "regulator", "regulatory", "doj", "investigation",
-        "compliance", "court", "probe", "fine", "penalty", "ruling", "whistleblower",
+        "sec",
+        "lawsuit",
+        "antitrust",
+        "regulator",
+        "regulatory",
+        "doj",
+        "investigation",
+        "compliance",
+        "court",
+        "probe",
+        "fine",
+        "penalty",
+        "ruling",
+        "whistleblower",
     },
     "Product, Technology & AI": {
-        "ai", "artificial intelligence", "chips", "gpu", "semiconductor", "software",
-        "cloud", "patent", "launch", "product", "platform", "model", "hardware", "device",
+        "ai",
+        "artificial intelligence",
+        "chips",
+        "gpu",
+        "semiconductor",
+        "software",
+        "cloud",
+        "patent",
+        "launch",
+        "product",
+        "platform",
+        "model",
+        "hardware",
+        "device",
     },
     "Capital Structure & Buybacks": {
-        "buyback", "share repurchase", "dividend", "dividends", "offering", "bonds",
-        "notes", "debt offering", "equity financing", "convertible", "refinancing",
+        "buyback",
+        "share repurchase",
+        "dividend",
+        "dividends",
+        "offering",
+        "bonds",
+        "notes",
+        "debt offering",
+        "equity financing",
+        "convertible",
+        "refinancing",
     },
 }
 
@@ -377,9 +547,15 @@ async def aggregate_ticker_sentiment(
             func.date(NewsArticle.published_at).label("day"),
             func.avg(NewsArticle.sentiment_score).label("avg_sentiment"),
             func.count(NewsArticle.id).label("total_articles"),
-            func.sum(case((NewsArticle.sentiment_label == "positive", 1), else_=0)).label("pos_count"),
-            func.sum(case((NewsArticle.sentiment_label == "negative", 1), else_=0)).label("neg_count"),
-            func.sum(case((NewsArticle.sentiment_label == "neutral", 1), else_=0)).label("neu_count"),
+            func.sum(case((NewsArticle.sentiment_label == "positive", 1), else_=0)).label(
+                "pos_count"
+            ),
+            func.sum(case((NewsArticle.sentiment_label == "negative", 1), else_=0)).label(
+                "neg_count"
+            ),
+            func.sum(case((NewsArticle.sentiment_label == "neutral", 1), else_=0)).label(
+                "neu_count"
+            ),
         )
         .join(NewsArticleInstrument, NewsArticle.id == NewsArticleInstrument.article_id)
         .where(
@@ -393,7 +569,9 @@ async def aggregate_ticker_sentiment(
     return [
         {
             "date": str(r.day),
-            "avg_sentiment": round(float(r.avg_sentiment), 4) if r.avg_sentiment is not None else 0.0,
+            "avg_sentiment": round(float(r.avg_sentiment), 4)
+            if r.avg_sentiment is not None
+            else 0.0,
             "total_articles": int(r.total_articles),
             "positive": int(r.pos_count or 0),
             "negative": int(r.neg_count or 0),
@@ -413,7 +591,11 @@ async def get_sentiment_price_overlay(
     inst_stmt = select(Instrument).where(Instrument.ticker == ticker_clean)
     instrument = (await session.execute(inst_stmt)).scalar_one_or_none()
     if not instrument:
-        return {"ticker": ticker_clean, "points": [], "error": f"Instrument '{ticker_clean}' not found"}
+        return {
+            "ticker": ticker_clean,
+            "points": [],
+            "error": f"Instrument '{ticker_clean}' not found",
+        }
 
     cutoff_date = (datetime.now(UTC) - timedelta(days=days)).date()
 
@@ -434,13 +616,15 @@ async def get_sentiment_price_overlay(
     for b in bars:
         d_str = b.ts.strftime("%Y-%m-%d")
         s_data = sent_by_date.get(d_str)
-        points.append({
-            "date": d_str,
-            "close": float(b.close),
-            "volume": b.volume,
-            "sentiment": s_data["avg_sentiment"] if s_data else None,
-            "articles_count": s_data["total_articles"] if s_data else 0,
-        })
+        points.append(
+            {
+                "date": d_str,
+                "close": float(b.close),
+                "volume": b.volume,
+                "sentiment": s_data["avg_sentiment"] if s_data else None,
+                "articles_count": s_data["total_articles"] if s_data else 0,
+            }
+        )
 
     return {
         "ticker": ticker_clean,

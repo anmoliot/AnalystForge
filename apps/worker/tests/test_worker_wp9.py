@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from analystforge.api.db import Database
@@ -14,7 +15,6 @@ from analystforge.api.services.maintenance import run_operational_cleanup
 from analystforge.worker.main import (
     WorkerSettings,
     ping,
-    cleanup_database,
 )
 
 

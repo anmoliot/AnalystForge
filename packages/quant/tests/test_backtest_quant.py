@@ -4,6 +4,8 @@ sandboxed execution, look-ahead bias detector, DSR overfitting, and walk-forward
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,6 +13,7 @@ import pytest
 from analystforge.quant.backtest import (
     LookAheadBiasError,
     SandboxSecurityError,
+    SandboxUnavailableError,
     atr,
     bollinger_bands,
     check_lookahead_bias,
@@ -18,7 +21,6 @@ from analystforge.quant.backtest import (
     ema,
     evaluate_rule_group,
     macd,
-    probabilistic_sharpe_ratio,
     rsi,
     run_out_of_sample_split,
     run_parameter_sweep_2d,
@@ -69,9 +71,9 @@ def test_technical_indicators(sample_ohlcv: pd.DataFrame) -> None:
     assert len(r) == 100
     assert 0 <= r.iloc[50] <= 100
 
-    u, m, l = bollinger_bands(close, window=20, num_std=2.0)
+    u, m, item = bollinger_bands(close, window=20, num_std=2.0)
     assert (u.dropna() >= m.dropna()).all()
-    assert (m.dropna() >= l.dropna()).all()
+    assert (m.dropna() >= item.dropna()).all()
 
     m_line, s_line, hist = macd(close, fast=12, slow=26, signal=9)
     assert len(m_line) == 100
@@ -88,7 +90,11 @@ def test_rule_builder_evaluation(sample_ohlcv: pd.DataFrame) -> None:
         "combinator": "AND",
         "rules": [
             {"left": {"name": "RSI", "params": {"period": 14}}, "op": "<", "right": 70.0},
-            {"left": {"name": "CLOSE"}, "op": ">=", "right": {"name": "SMA", "params": {"window": 20}}},
+            {
+                "left": {"name": "CLOSE"},
+                "op": ">=",
+                "right": {"name": "SMA", "params": {"window": 20}},
+            },
         ],
     }
 
@@ -203,6 +209,10 @@ def generate_signals(df):
         run_sandboxed_strategy(code_dunder, sample_ohlcv)
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Sandboxed subprocess execution requires Unix resource limits (not available on Windows)",
+)
 def test_sandbox_legitimate_code_succeeds(sample_ohlcv: pd.DataFrame) -> None:
     code_ok = """
 import numpy as np
@@ -222,9 +232,32 @@ def generate_signals(df):
     assert all(s in (0, 1) for s in signals)
 
 
+def test_sandbox_windows_unsupported(sample_ohlcv: pd.DataFrame) -> None:
+    """Import succeeds on Windows, sandbox execution is refused with a clear reason."""
+    code_ok = """
+import numpy as np
+
+def generate_signals(df):
+    return [0] * len(df)
+"""
+    if sys.platform == "win32":
+        with pytest.raises(SandboxUnavailableError, match="not supported on Windows"):
+            run_sandboxed_strategy(code_ok, sample_ohlcv)
+    else:
+        from unittest.mock import patch
+
+        with (
+            patch("analystforge.quant.backtest.sandbox.resource", None),
+            pytest.raises(SandboxUnavailableError, match="Unix resource limits"),
+        ):
+            run_sandboxed_strategy(code_ok, sample_ohlcv)
+
+
 def test_deflated_sharpe_ratio_and_overfitting() -> None:
     # 1 trial, Sharpe 1.5 -> no overfitting discount
-    dsr1, max_sr1, warn1 = deflated_sharpe_ratio(sr_hat=1.5, num_observations=252, trials_conducted=1)
+    dsr1, _max_sr1, warn1 = deflated_sharpe_ratio(
+        sr_hat=1.5, num_observations=252, trials_conducted=1
+    )
     assert dsr1 > 0.95
     assert warn1 == ""
 
@@ -266,7 +299,7 @@ def test_parameter_sweep_and_walk_forward(sample_ohlcv: pd.DataFrame) -> None:
     assert sweep_res.trials_count == 4
 
     # Out-of-sample split
-    is_m, oos_m, eff, warn = run_out_of_sample_split(
+    is_m, oos_m, _eff, _warn = run_out_of_sample_split(
         sample_ohlcv,
         strategy_factory(5, 15),
         split_ratio=0.7,

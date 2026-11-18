@@ -6,8 +6,8 @@ Never logs, prints, or exposes API keys.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-import os
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from analystforge.api.config import get_settings
@@ -40,7 +40,7 @@ async def test_live_fred_api(settings) -> None:
         assert reachable, f"FRED reachability failed: {err}"
 
         # Ingest sample series (10-Year Treasury Constant Maturity)
-        end = date.today()
+        end = datetime.now(UTC).date()
         start = end - timedelta(days=30)
         spec = MacroSeriesSpec(
             code="DGS10",
@@ -82,11 +82,15 @@ async def test_live_groq_llm_api(settings) -> None:
 
         # Chat completion test
         messages = [
-            ChatMessage(role="system", content="You are a concise financial assistant. Reply in one sentence."),
+            ChatMessage(
+                role="system",
+                content="You are a concise financial assistant. Reply in one sentence.",
+            ),
             ChatMessage(role="user", content="What is the definition of Free Cash Flow to Equity?"),
         ]
         resp = await provider.complete(messages, max_tokens=300)
-        assert resp.content and len(resp.content) > 10
+        assert resp.content
+        assert len(resp.content) > 10
         assert resp.model
 
         # Streaming test

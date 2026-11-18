@@ -18,7 +18,6 @@ from analystforge.api.services.alerts import (
     evaluate_alert_rules,
     run_scheduled_screens_and_dispatch,
 )
-from analystforge.api.services.maintenance import run_operational_cleanup
 from analystforge.api.services.ingest import (
     IngestionSummary,
     ingest_fundamentals,
@@ -29,6 +28,7 @@ from analystforge.api.services.ingest import (
     ingest_seed,
     run_recorded,
 )
+from analystforge.api.services.maintenance import run_operational_cleanup
 from analystforge.api.services.quality import run_quality_checks
 from analystforge.api.services.runtime import build_app_registry
 

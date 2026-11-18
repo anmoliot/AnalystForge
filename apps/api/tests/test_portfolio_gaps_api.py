@@ -5,7 +5,6 @@ Fama-French factor exposures, rolling stats, and Brinson attribution.
 
 from __future__ import annotations
 
-import io
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -23,11 +22,21 @@ async def _seed_test_portfolio_prices(db: Database, tickers: list[str]) -> None:
     async with db.session() as session:
         ex = await session.get(Exchange, "NASDAQ")
         if not ex:
-            session.add(Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD"))
+            session.add(
+                Exchange(
+                    code="NASDAQ",
+                    name="Nasdaq",
+                    country="US",
+                    timezone="America/New_York",
+                    currency="USD",
+                )
+            )
             await session.flush()
 
         for ticker in tickers:
-            inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+            inst = (
+                await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+            ).scalar_one_or_none()
             if not inst:
                 inst = Instrument(
                     id=uuid.uuid4(),
@@ -161,12 +170,24 @@ async def test_rebalance_and_optimization_constraints(
     await client.post(
         f"/api/v1/portfolios/{port_id}/transactions",
         headers=auth_headers,
-        json={"ticker": "AAPL", "transaction_type": "BUY", "trade_date": "2024-01-02", "quantity": 100, "price": 150},
+        json={
+            "ticker": "AAPL",
+            "transaction_type": "BUY",
+            "trade_date": "2024-01-02",
+            "quantity": 100,
+            "price": 150,
+        },
     )
     await client.post(
         f"/api/v1/portfolios/{port_id}/transactions",
         headers=auth_headers,
-        json={"ticker": "MSFT", "transaction_type": "BUY", "trade_date": "2024-01-02", "quantity": 50, "price": 350},
+        json={
+            "ticker": "MSFT",
+            "transaction_type": "BUY",
+            "trade_date": "2024-01-02",
+            "quantity": 50,
+            "price": 350,
+        },
     )
 
     # 1. Test Rebalance endpoint
@@ -221,12 +242,24 @@ async def test_factors_rolling_black_litterman_and_attribution(
     await client.post(
         f"/api/v1/portfolios/{port_id}/transactions",
         headers=auth_headers,
-        json={"ticker": "AAPL", "transaction_type": "BUY", "trade_date": "2024-01-02", "quantity": 100, "price": 150},
+        json={
+            "ticker": "AAPL",
+            "transaction_type": "BUY",
+            "trade_date": "2024-01-02",
+            "quantity": 100,
+            "price": 150,
+        },
     )
     await client.post(
         f"/api/v1/portfolios/{port_id}/transactions",
         headers=auth_headers,
-        json={"ticker": "MSFT", "transaction_type": "BUY", "trade_date": "2024-01-02", "quantity": 50, "price": 350},
+        json={
+            "ticker": "MSFT",
+            "transaction_type": "BUY",
+            "trade_date": "2024-01-02",
+            "quantity": 50,
+            "price": 350,
+        },
     )
 
     # 1. Fama-French factor exposure
@@ -257,9 +290,7 @@ async def test_factors_rolling_black_litterman_and_attribution(
         headers=auth_headers,
         json={
             "market_weights": {"AAPL": 0.5, "MSFT": 0.5},
-            "views": [
-                {"assets": {"AAPL": 1.0, "MSFT": 0.0}, "expected_return": 0.15}
-            ],
+            "views": [{"assets": {"AAPL": 1.0, "MSFT": 0.0}, "expected_return": 0.15}],
             "risk_aversion": 2.5,
         },
     )

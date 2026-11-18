@@ -9,11 +9,10 @@ from decimal import Decimal
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from analystforge.quant.black_litterman import black_litterman
 from analystforge.quant.factors import fama_french_regression
-from analystforge.quant.optimization import max_sharpe, min_variance
+from analystforge.quant.optimization import min_variance
 from analystforge.quant.rebalance import (
     TradeAction,
     generate_rebalance_trades,
@@ -23,7 +22,6 @@ from analystforge.quant.risk import (
     beta,
     cvar_historical,
     information_ratio,
-    max_drawdown,
     sharpe,
     tracking_error,
     var_historical,
@@ -157,10 +155,10 @@ def test_black_litterman_views_updating() -> None:
     assert abs(prior_res.implied_returns[1] - 0.0625) < 1e-4
 
     # View: Asset A will return 12% (bullish view on asset 0)
-    P = [[1.0, 0.0]]
-    Q = [0.12]
+    p = [[1.0, 0.0]]
+    q = [0.12]
 
-    post_res = black_litterman(cov, w_mkt, views_matrix=P, views_returns=Q, risk_aversion=delta)
+    post_res = black_litterman(cov, w_mkt, views_matrix=p, views_returns=q, risk_aversion=delta)
 
     # Posterior expected return for Asset A should be higher than prior (0.0625 -> > 0.08)
     assert post_res.posterior_returns[0] > 0.08
@@ -233,7 +231,8 @@ def test_golden_file_portfolio_returns_and_risk() -> None:
     # 2. Sharpe (rf=0)
     sr = sharpe(portfolio_rets, risk_free=0.0, periods=252)
     expected_sr = float(portfolio_rets.mean() / sample_std * math.sqrt(252))
-    assert sr is not None and abs(sr - expected_sr) < 1e-6
+    assert sr is not None
+    assert abs(sr - expected_sr) < 1e-6
 
     # 3. Beta & Alpha
     b = beta(portfolio_rets, benchmark_rets)
@@ -241,11 +240,15 @@ def test_golden_file_portfolio_returns_and_risk() -> None:
     cov_val = np.cov(portfolio_rets, benchmark_rets, ddof=1)[0, 1]
     var_bench = np.var(benchmark_rets, ddof=1)
     expected_beta = cov_val / var_bench
-    assert b is not None and abs(b - expected_beta) < 1e-6
+    assert b is not None
+    assert abs(b - expected_beta) < 1e-6
 
     a = alpha(portfolio_rets, benchmark_rets, risk_free=0.0, periods=252)
-    expected_alpha = float(portfolio_rets.mean() * 252 - expected_beta * (benchmark_rets.mean() * 252))
-    assert a is not None and abs(a - expected_alpha) < 1e-6
+    expected_alpha = float(
+        portfolio_rets.mean() * 252 - expected_beta * (benchmark_rets.mean() * 252)
+    )
+    assert a is not None
+    assert abs(a - expected_alpha) < 1e-6
 
     # 4. Tracking Error & Information Ratio
     te = tracking_error(portfolio_rets, benchmark_rets, periods=252)
@@ -255,7 +258,8 @@ def test_golden_file_portfolio_returns_and_risk() -> None:
 
     ir = information_ratio(portfolio_rets, benchmark_rets, periods=252)
     expected_ir = float((diff.mean() * 252) / expected_te)
-    assert ir is not None and abs(ir - expected_ir) < 1e-6
+    assert ir is not None
+    assert abs(ir - expected_ir) < 1e-6
 
     # 5. Historical VaR and CVaR (95%)
     # -percentile(returns, 5%)

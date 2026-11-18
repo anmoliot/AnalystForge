@@ -6,8 +6,9 @@ and out-of-sample performance degradation.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -130,7 +131,9 @@ def run_walk_forward_analysis(
         test_sig = signal_fn(fold_test_df)
 
         _, _, is_met = run_strategy_simulation(fold_train_df, train_sig, **sim_kwargs)
-        test_eq, test_trades, oos_met = run_strategy_simulation(fold_test_df, test_sig, **sim_kwargs)
+        test_eq, test_trades, oos_met = run_strategy_simulation(
+            fold_test_df, test_sig, **sim_kwargs
+        )
 
         is_sr = is_met.sharpe_ratio or 0.0
         oos_sr = oos_met.sharpe_ratio or 0.0

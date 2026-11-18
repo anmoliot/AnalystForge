@@ -2,7 +2,6 @@
 
 import pytest
 import respx
-import httpx
 
 from analystforge_sdk.client import AnalystForgeClient, AnalystForgeError
 

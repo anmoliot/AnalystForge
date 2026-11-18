@@ -10,8 +10,7 @@ vi.mock("@/lib/api", () => ({
     get: vi.fn().mockResolvedValue([]),
     post: vi.fn().mockImplementation((path: string) => {
       if (path.includes("/screener/run")) {
-        return Promise.resolve({
-          items: [
+        return Promise.resolve([
             {
               id: "1",
               ticker: "NVDA",
@@ -20,15 +19,13 @@ vi.mock("@/lib/api", () => ({
               currency: "USD",
               sector: "Technology",
               industry: "Semiconductors",
-              latest_price: 135.5,
+              price: 135.5,
               pe_ratio: 45.2,
               pb_ratio: 32.1,
               roe: 0.88,
               market_cap: 3350000000000,
             },
-          ],
-          total: 1,
-        });
+        ]);
       }
       return Promise.resolve({});
     }),

@@ -1,0 +1,112 @@
+[
+  {
+    "theme": "dark",
+    "page": "",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "login",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "companies/AAPL",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "valuation",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "portfolios",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "backtest",
+    "violations": [
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "targets": [
+          [
+            ".space-y-3 > .min-h-0.flex-1 > .justify-between.items-center.flex > h3"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "page": "screener",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "research",
+    "violations": []
+  },
+  {
+    "theme": "dark",
+    "page": "reports",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "login",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "companies/AAPL",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "valuation",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "portfolios",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "backtest",
+    "violations": [
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "targets": [
+          [
+            ".space-y-3 > .min-h-0.flex-1 > .justify-between.items-center.flex > h3"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "page": "screener",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "research",
+    "violations": []
+  },
+  {
+    "theme": "light",
+    "page": "reports",
+    "violations": []
+  }
+]

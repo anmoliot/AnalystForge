@@ -6,8 +6,9 @@ overfitting analysis via Deflated Sharpe Ratio (DSR).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -116,7 +117,9 @@ def run_parameter_sweep_2d(
         return_matrix=return_mat,
         drawdown_matrix=dd_mat,
         best_params=best_params,
-        best_metrics=best_metrics if best_metrics is not None else SimulationMetrics(
+        best_metrics=best_metrics
+        if best_metrics is not None
+        else SimulationMetrics(
             initial_capital=100000.0,
             final_equity=100000.0,
             total_return=0.0,

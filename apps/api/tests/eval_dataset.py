@@ -88,7 +88,6 @@ EVALUATION_QUESTIONS: list[dict[str, Any]] = [
         "expected_refusal": False,
         "required_citations": ["FACT"],
     },
-
     # -------------------------------------------------------------------------
     # Category 2: 10-K Item 1A Risk Factors & Item 7 MD&A Disclosures (10 Qs)
     # -------------------------------------------------------------------------
@@ -172,7 +171,6 @@ EVALUATION_QUESTIONS: list[dict[str, Any]] = [
         "expected_refusal": False,
         "required_citations": ["FILING"],
     },
-
     # -------------------------------------------------------------------------
     # Category 3: Market Intelligence, News Events & Valuation (10 Qs)
     # -------------------------------------------------------------------------
@@ -256,7 +254,6 @@ EVALUATION_QUESTIONS: list[dict[str, Any]] = [
         "expected_refusal": False,
         "required_citations": ["FACT"],
     },
-
     # -------------------------------------------------------------------------
     # Category 4: Unanswerable, Speculative, and Hallucination-Trap Questions (20 Qs)
     # (MUST Trigger Strict Refusal: "I cannot find sufficient evidence...")

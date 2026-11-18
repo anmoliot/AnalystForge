@@ -183,7 +183,7 @@ export default function Companies() {
                     {overview.change_pct !== null && (
                       <div
                         className={`flex items-center text-xs font-semibold ${
-                          overview.change_pct >= 0 ? "text-emerald-500" : "text-rose-500"
+                          overview.change_pct >= 0 ? "text-accent" : "text-negative"
                         }`}
                       >
                         {overview.change_pct >= 0 ? (
@@ -563,7 +563,7 @@ export default function Companies() {
                   </div>
 
                   {selectedRatio.note && (
-                    <div className="rounded-md bg-amber-500/10 p-2.5 text-xs text-amber-500">
+                    <div className="rounded-md bg-amber-500/10 p-2.5 text-xs text-warning">
                       <strong>Note:</strong> {selectedRatio.note}
                     </div>
                   )}

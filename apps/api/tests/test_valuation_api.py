@@ -5,8 +5,6 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from analystforge.api.db import Database
-
 
 @pytest.fixture
 def sample_dcf_payload() -> dict:
@@ -51,9 +49,7 @@ async def test_dcf_calculation_matches_reference(
 
 
 @pytest.mark.asyncio
-async def test_dcf_sensitivity_grid(
-    client: httpx.AsyncClient, sample_dcf_payload: dict
-) -> None:
+async def test_dcf_sensitivity_grid(client: httpx.AsyncClient, sample_dcf_payload: dict) -> None:
     resp = await client.post("/api/v1/valuation/dcf/sensitivity", json=sample_dcf_payload)
     assert resp.status_code == 200
     data = resp.json()
@@ -66,9 +62,7 @@ async def test_dcf_sensitivity_grid(
 
 
 @pytest.mark.asyncio
-async def test_dcf_monte_carlo(
-    client: httpx.AsyncClient, sample_dcf_payload: dict
-) -> None:
+async def test_dcf_monte_carlo(client: httpx.AsyncClient, sample_dcf_payload: dict) -> None:
     resp = await client.post(
         "/api/v1/valuation/dcf/montecarlo?iterations=200", json=sample_dcf_payload
     )
@@ -83,9 +77,7 @@ async def test_dcf_monte_carlo(
 
 
 @pytest.mark.asyncio
-async def test_dcf_excel_export(
-    client: httpx.AsyncClient, sample_dcf_payload: dict
-) -> None:
+async def test_dcf_excel_export(client: httpx.AsyncClient, sample_dcf_payload: dict) -> None:
     resp = await client.post("/api/v1/valuation/dcf/export/excel", json=sample_dcf_payload)
     assert resp.status_code == 200
     assert "spreadsheetml" in resp.headers["content-type"]

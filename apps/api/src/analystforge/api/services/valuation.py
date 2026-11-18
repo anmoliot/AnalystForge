@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 import io
-import math
-import uuid
+import logging
+from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -14,9 +13,6 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.models.macro import MacroObservation
-from analystforge.api.models.market import Instrument, PriceBar
-from analystforge.api.models.research import FundamentalFact
-from analystforge.api.models.valuation import ValuationModel, ValuationVersion
 from analystforge.quant.dcf import DCFAssumptions, DCFResult, TerminalValueMethod, run_dcf
 from analystforge.quant.ddm import (
     MultiStageDDMAssumptions,
@@ -26,8 +22,10 @@ from analystforge.quant.ddm import (
 from analystforge.quant.fcfe import (
     FCFEAssumptions,
     FCFEResult,
-    TerminalValueMethod as FCFETerminalValueMethod,
     fcfe_valuation,
+)
+from analystforge.quant.fcfe import (
+    TerminalValueMethod as FCFETerminalValueMethod,
 )
 from analystforge.quant.football_field import (
     FootballFieldResult,
@@ -36,12 +34,6 @@ from analystforge.quant.football_field import (
 )
 from analystforge.quant.money import to_decimal
 from analystforge.quant.multiples import (
-    MultipleInputs,
-    PeerStats,
-    compute_multiples,
-    implied_enterprise_value,
-    implied_equity_value,
-    implied_share_price,
     peer_statistics,
 )
 from analystforge.quant.precedents import (
@@ -61,8 +53,6 @@ from analystforge.quant.wacc import (
     after_tax_cost_of_debt,
     blume_adjusted_beta,
     capm_cost_of_equity,
-    compute_wacc,
-    wacc_from_capm,
 )
 
 
@@ -76,9 +66,13 @@ def execute_dcf(params: dict[str, Any]) -> dict[str, Any]:
         wacc=to_decimal(params["wacc"]),
         terminal_growth=to_decimal(params.get("terminal_growth", Decimal("0.025"))),
         shares_outstanding=to_decimal(params["shares_outstanding"]),
-        depreciation_pct_revenue=to_decimal(params.get("depreciation_pct_revenue", Decimal("0.04"))),
+        depreciation_pct_revenue=to_decimal(
+            params.get("depreciation_pct_revenue", Decimal("0.04"))
+        ),
         capex_pct_revenue=to_decimal(params.get("capex_pct_revenue", Decimal("0.05"))),
-        nwc_pct_incremental_revenue=to_decimal(params.get("nwc_pct_incremental_revenue", Decimal("0.10"))),
+        nwc_pct_incremental_revenue=to_decimal(
+            params.get("nwc_pct_incremental_revenue", Decimal("0.10"))
+        ),
         net_debt=to_decimal(params.get("net_debt", Decimal("0"))),
         mid_year_convention=bool(params.get("mid_year_convention", True)),
         terminal_method=TerminalValueMethod(params.get("terminal_method", "gordon_growth")),
@@ -392,11 +386,15 @@ async def execute_wacc_builder(session: AsyncSession, params: dict[str, Any]) ->
     beta = float(blume_adjusted_beta(to_decimal(raw_beta))) if apply_blume else raw_beta
 
     erp = float(params.get("equity_risk_premium", 0.055))
-    cost_of_equity = float(capm_cost_of_equity(to_decimal(rf_rate), to_decimal(beta), to_decimal(erp)))
+    cost_of_equity = float(
+        capm_cost_of_equity(to_decimal(rf_rate), to_decimal(beta), to_decimal(erp))
+    )
 
     pre_tax_cost_of_debt = float(params.get("pre_tax_cost_of_debt", 0.055))
     tax_rate = float(params.get("tax_rate", 0.21))
-    after_tax_debt = float(after_tax_cost_of_debt(to_decimal(pre_tax_cost_of_debt), to_decimal(tax_rate)))
+    after_tax_debt = float(
+        after_tax_cost_of_debt(to_decimal(pre_tax_cost_of_debt), to_decimal(tax_rate))
+    )
 
     mv_equity = float(params.get("market_value_equity", 1000000))
     mv_debt = float(params.get("market_value_debt", 250000))
@@ -487,7 +485,10 @@ def compute_sensitivity_grid(
             try:
                 res = execute_dcf(p)
                 row.append(round(res["value_per_share"], 2))
-            except Exception:
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "operation unavailable (%s)", type(exc).__name__
+                )
                 row.append(None)
         matrix.append(row)
 
@@ -519,7 +520,8 @@ def compute_monte_carlo(
         try:
             res = execute_dcf(p)
             values.append(res["value_per_share"])
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             continue
 
     if not values:
@@ -548,16 +550,20 @@ def generate_dcf_excel_workbook(
     wb = xlsxwriter.Workbook(output, {"in_memory": True})
 
     fmt_title = wb.add_format({"bold": True, "font_size": 14, "font_color": "#1e293b"})
-    fmt_header = wb.add_format({
-        "bold": True,
-        "bg_color": "#0f172a",
-        "font_color": "#ffffff",
-        "border": 1,
-        "align": "center",
-    })
+    fmt_header = wb.add_format(
+        {
+            "bold": True,
+            "bg_color": "#0f172a",
+            "font_color": "#ffffff",
+            "border": 1,
+            "align": "center",
+        }
+    )
     fmt_currency = wb.add_format({"num_format": "$#,##0.00", "border": 1})
     fmt_pct = wb.add_format({"num_format": "0.0%", "border": 1})
-    fmt_bold_curr = wb.add_format({"bold": True, "num_format": "$#,##0.00", "border": 1, "bg_color": "#f1f5f9"})
+    fmt_bold_curr = wb.add_format(
+        {"bold": True, "num_format": "$#,##0.00", "border": 1, "bg_color": "#f1f5f9"}
+    )
     fmt_label = wb.add_format({"bold": True, "border": 1})
     fmt_regular = wb.add_format({"border": 1})
 
@@ -576,7 +582,11 @@ def generate_dcf_excel_workbook(
         ("Net Debt ($)", float(params.get("net_debt", 0)), fmt_currency),
         ("Depreciation % Revenue", float(params.get("depreciation_pct_revenue", 0.04)), fmt_pct),
         ("CapEx % Revenue", float(params.get("capex_pct_revenue", 0.05)), fmt_pct),
-        ("NWC % Incremental Revenue", float(params.get("nwc_pct_incremental_revenue", 0.10)), fmt_pct),
+        (
+            "NWC % Incremental Revenue",
+            float(params.get("nwc_pct_incremental_revenue", 0.10)),
+            fmt_pct,
+        ),
     ]
 
     for idx, (lbl, val, fmt) in enumerate(assumptions_rows, start=3):
@@ -626,12 +636,19 @@ def generate_dcf_excel_workbook(
     ws_dcf.write("A7", "FCFF ($)", fmt_bold_curr)
     for col_idx in range(forecast_years):
         col_letter = chr(ord("B") + col_idx)
-        ws_dcf.write_formula(6, col_idx + 1, f"={col_letter}6+{col_letter}3*Assumptions!$B$9-{col_letter}3*Assumptions!$B$10", fmt_bold_curr)
+        ws_dcf.write_formula(
+            6,
+            col_idx + 1,
+            f"={col_letter}6+{col_letter}3*Assumptions!$B$9-{col_letter}3*Assumptions!$B$10",
+            fmt_bold_curr,
+        )
 
     ws_dcf.write("A8", "Present Value ($)", fmt_currency)
     for col_idx in range(forecast_years):
         col_letter = chr(ord("B") + col_idx)
-        ws_dcf.write_formula(7, col_idx + 1, f"={col_letter}7/((1+Assumptions!$B$5)^{col_idx + 1})", fmt_currency)
+        ws_dcf.write_formula(
+            7, col_idx + 1, f"={col_letter}7/((1+Assumptions!$B$5)^{col_idx + 1})", fmt_currency
+        )
 
     # Sheet 3: Valuation Summary
     ws_sum = wb.add_worksheet("Valuation Summary")

@@ -3,7 +3,7 @@ import {
   Download,
   Sliders,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -26,18 +26,18 @@ type ValuationSuiteTab =
   | "football_field";
 
 const BASE_ASSUMPTIONS: DCFPayload = {
-  ticker: "AAPL",
-  base_revenue: 383285, // $M
+  ticker: "",
+  base_revenue: 0, // $M
   revenue_growth: [0.08, 0.07, 0.06, 0.05, 0.04],
   ebit_margin: [0.30],
   tax_rate: 0.16,
   wacc: 0.088,
   terminal_growth: 0.025,
-  shares_outstanding: 15204, // M shares
+  shares_outstanding: 0, // M shares
   depreciation_pct_revenue: 0.03,
   capex_pct_revenue: 0.035,
   nwc_pct_incremental_revenue: 0.05,
-  net_debt: 65000, // $M
+  net_debt: 0, // $M
   mid_year_convention: true,
 };
 
@@ -70,140 +70,16 @@ export default function Valuation() {
   const sensitivityMutation = useMutation({ mutationFn: queries.dcfSensitivity });
   const monteCarloMutation = useMutation({ mutationFn: (p: DCFPayload) => queries.dcfMonteCarlo(p, 500) });
 
-  // FCFE mutation & state
-  const [fcfeParams] = useState({
-    ticker: "AAPL",
-    base_net_income: 97000,
-    net_income_growth: [0.08, 0.07, 0.06, 0.05, 0.04],
-    cost_of_equity: 0.095,
-    terminal_growth: 0.025,
-    shares_outstanding: 15204,
-    depreciation_pct_ni: 0.12,
-    capex_pct_ni: 0.14,
-    nwc_pct_ni: 0.04,
-    net_borrowing_pct_ni: 0.05,
-  });
-  const fcfeMutation = useMutation({ mutationFn: queries.runFcfe });
-
-  // Comps state & mutation
-  const [peerMultiples] = useState<number[]>([18.5, 22.0, 24.5, 26.0, 31.0]);
-  const [compsMetric] = useState<number>(120000); // EBITDA $M
-  const [compsNetDebt] = useState<number>(65000);
-  const [compsShares] = useState<number>(15204);
-  const compsMutation = useMutation({ mutationFn: queries.runComps });
-
-  // DDM state & mutation
-  const [ddmParams] = useState({
-    ticker: "AAPL",
-    model_type: "gordon",
-    dividend_t0: 1.00,
-    growth_rate: 0.05,
-    cost_of_equity: 0.085,
-    base_dividend: 1.00,
-    stage1_growth: [0.08, 0.07, 0.06],
-    terminal_growth: 0.03,
-  });
-  const ddmMutation = useMutation({ mutationFn: queries.runDdm });
-
-  // Residual Income state & mutation
-  const [riParams] = useState({
-    ticker: "AAPL",
-    base_book_value: 62000,
-    forecast_net_income: [102000, 110000, 118000],
-    cost_of_equity: 0.095,
-    shares_outstanding: 15204,
-    dividend_payout_ratio: 0.15,
-    terminal_method: "gordon_growth",
-    terminal_growth: 0.02,
-  });
-  const riMutation = useMutation({ mutationFn: queries.runResidualIncome });
-
-  // SOTP state & mutation
-  const [sotpSegments] = useState([
-    { name: "Hardware & Devices", metric_name: "Revenue", metric_value: 200000, multiple: 3.5, ownership_pct: 1.0 },
-    { name: "Services & Cloud", metric_name: "EBITDA", metric_value: 60000, multiple: 22.0, ownership_pct: 1.0 },
-  ]);
-  const [sotpNetDebt] = useState<number>(65000);
-  const [sotpShares] = useState<number>(15204);
-  const sotpMutation = useMutation({ mutationFn: queries.runSotp });
-
-  // Precedents state & mutation
-  const [precedentsDeals] = useState([
-    { target: "TechComp Alpha", announced_date: "2024-02-15", deal_value: 45000, target_metric: 2500 },
-    { target: "CloudEdge Systems", announced_date: "2024-07-20", deal_value: 68000, target_metric: 3200 },
-    { target: "CyberGuard Global", announced_date: "2024-10-10", deal_value: 28000, target_metric: 1600 },
-  ]);
-  const [precMetric] = useState<number>(3000);
-  const precedentsMutation = useMutation({ mutationFn: queries.runPrecedents });
-
-  // WACC Builder state & mutation
-  const [waccInputs] = useState({
-    raw_beta: 1.25,
-    apply_blume: true,
-    risk_free_rate: 0.0435,
-    equity_risk_premium: 0.055,
-    pre_tax_cost_of_debt: 0.052,
-    tax_rate: 0.16,
-    market_value_equity: 2800000,
-    market_value_debt: 110000,
-  });
-  const waccMutation = useMutation({ mutationFn: queries.deriveWacc });
-
-  // Football Field state & mutation
-  const footballFieldMutation = useMutation({ mutationFn: queries.runFootballField });
-
   const runAll = (p: DCFPayload) => {
     dcfMutation.mutate(p);
     sensitivityMutation.mutate(p);
     monteCarloMutation.mutate(p);
   };
 
-  useEffect(() => {
-    runAll(params);
-    fcfeMutation.mutate(fcfeParams);
-    compsMutation.mutate({
-      ticker: params.ticker,
-      peer_multiples: peerMultiples,
-      target_metric: compsMetric,
-      net_debt: compsNetDebt,
-      shares_outstanding: compsShares,
-      is_equity_multiple: false,
-    });
-    ddmMutation.mutate(ddmParams);
-    riMutation.mutate(riParams);
-    sotpMutation.mutate({
-      ticker: params.ticker,
-      segments: sotpSegments,
-      net_debt: sotpNetDebt,
-      shares_outstanding: sotpShares,
-    });
-    precedentsMutation.mutate({
-      ticker: params.ticker,
-      deals: precedentsDeals,
-      target_metric: precMetric,
-      net_debt: compsNetDebt,
-      shares_outstanding: compsShares,
-    });
-    waccMutation.mutate(waccInputs);
-    footballFieldMutation.mutate({
-      ticker: params.ticker,
-      current_share_price: 185.0,
-      ranges: [
-        { method_id: "dcf_fcff", label: "DCF (FCFF)", category: "Intrinsic", low: 165.0, base: 193.0, high: 220.0 },
-        { method_id: "fcfe", label: "FCFE Model", category: "Intrinsic", low: 160.0, base: 188.0, high: 215.0 },
-        { method_id: "comps_ebitda", label: "Comps EV/EBITDA", category: "Comps", low: 155.0, base: 180.0, high: 210.0 },
-        { method_id: "ddm", label: "DDM Multi-Stage", category: "Intrinsic", low: 140.0, base: 170.0, high: 195.0 },
-        { method_id: "precedents", label: "Precedent Deals", category: "Transactions", low: 175.0, base: 200.0, high: 235.0 },
-      ],
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleScenarioChange = (s: "base" | "bull" | "bear") => {
     setScenario(s);
-    const newP = { ...SCENARIOS[s], ticker: params.ticker };
+    const newP = { ...params, revenue_growth: SCENARIOS[s].revenue_growth, ebit_margin: SCENARIOS[s].ebit_margin, terminal_growth: SCENARIOS[s].terminal_growth, wacc: SCENARIOS[s].wacc };
     setParams(newP);
-    runAll(newP);
   };
 
   const handleRecalculate = (e: React.FormEvent) => {
@@ -235,10 +111,6 @@ export default function Valuation() {
   const dcf = dcfMutation.data;
   const sens = sensitivityMutation.data;
   const mc = monteCarloMutation.data;
-  const comps = compsMutation.data as Record<string, number> | undefined;
-  const ff = footballFieldMutation.data as { composite_low: number; composite_high: number; ranges: Array<{ method_id: string; label: string; low: number; base: number; high: number }> } | undefined;
-  const waccRes = waccMutation.data as Record<string, number | string> | undefined;
-
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-4 p-4">
       {/* Page Header */}
@@ -269,7 +141,7 @@ export default function Valuation() {
             ))}
           </div>
 
-          <Button variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5">
+          <Button disabled={!params.ticker || params.base_revenue <= 0 || params.shares_outstanding <= 0} variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5">
             <Download className="h-3.5 w-3.5" />
             Excel Export
           </Button>
@@ -318,11 +190,13 @@ export default function Valuation() {
                 <Badge tone="accent">Scenario: {scenario}</Badge>
               </div>
 
+              {dcfMutation.error && <p role="alert">{dcfMutation.error.message}</p>}
+              <p>Enter reported revenue, net debt and shares outstanding before calculating. Forecast rates are editable scenario assumptions.</p>
               <form onSubmit={handleRecalculate} className="space-y-3.5 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-medium text-muted-foreground">Ticker</label>
-                    <input
+                    <input aria-label="Ticker"
                       type="text"
                       value={params.ticker}
                       onChange={(e) => setParams({ ...params, ticker: e.target.value.toUpperCase() })}
@@ -331,7 +205,7 @@ export default function Valuation() {
                   </div>
                   <div>
                     <label className="font-medium text-muted-foreground">Base Revenue ($M)</label>
-                    <input
+                    <input aria-label="Base Revenue ($M)"
                       type="number"
                       step="any"
                       value={params.base_revenue}
@@ -348,7 +222,7 @@ export default function Valuation() {
                   </label>
                   <div className="mt-1 grid grid-cols-5 gap-1.5">
                     {params.revenue_growth.map((g, idx) => (
-                      <input
+                      <input aria-label="5-Year Revenue Growth Rates (Yr 1 - Yr 5)"
                         key={idx}
                         type="number"
                         step="0.01"
@@ -368,7 +242,7 @@ export default function Valuation() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-medium text-muted-foreground">EBIT Margin</label>
-                    <input
+                    <input aria-label="EBIT Margin"
                       type="number"
                       step="0.01"
                       value={params.ebit_margin[0]}
@@ -378,7 +252,7 @@ export default function Valuation() {
                   </div>
                   <div>
                     <label className="font-medium text-muted-foreground">Tax Rate</label>
-                    <input
+                    <input aria-label="Tax Rate"
                       type="number"
                       step="0.01"
                       value={params.tax_rate}
@@ -391,7 +265,7 @@ export default function Valuation() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-medium text-muted-foreground">Discount Rate (WACC)</label>
-                    <input
+                    <input aria-label="Discount Rate (WACC)"
                       type="number"
                       step="0.001"
                       value={params.wacc}
@@ -401,7 +275,7 @@ export default function Valuation() {
                   </div>
                   <div>
                     <label className="font-medium text-muted-foreground">Terminal Growth (g)</label>
-                    <input
+                    <input aria-label="Terminal Growth (g)"
                       type="number"
                       step="0.001"
                       value={params.terminal_growth}
@@ -414,7 +288,7 @@ export default function Valuation() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-medium text-muted-foreground">Net Debt ($M)</label>
-                    <input
+                    <input aria-label="Net Debt ($M)"
                       type="number"
                       value={params.net_debt ?? 0}
                       onChange={(e) => setParams({ ...params, net_debt: Number(e.target.value) })}
@@ -423,7 +297,7 @@ export default function Valuation() {
                   </div>
                   <div>
                     <label className="font-medium text-muted-foreground">Shares Out (M)</label>
-                    <input
+                    <input aria-label="Shares Out (M)"
                       type="number"
                       value={params.shares_outstanding}
                       onChange={(e) => setParams({ ...params, shares_outstanding: Number(e.target.value) })}
@@ -432,7 +306,7 @@ export default function Valuation() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full">
+                <Button disabled={!params.ticker || params.base_revenue <= 0 || params.shares_outstanding <= 0} type="submit" className="w-full">
                   Recalculate Model
                 </Button>
               </form>
@@ -533,9 +407,9 @@ export default function Valuation() {
                           ))}
                         </tr>
                         <tr className="font-bold bg-muted/30">
-                          <td className="py-2 font-sans text-primary">FCFF</td>
+                          <td className="py-2 font-sans text-ink">FCFF</td>
                           {dcf.forecast.map((f) => (
-                            <td key={f.year} className="py-2 text-right text-primary">{formatNumber(f.fcff, 1)}</td>
+                            <td key={f.year} className="py-2 text-right text-ink">{formatNumber(f.fcff, 1)}</td>
                           ))}
                         </tr>
                         <tr>
@@ -588,7 +462,7 @@ export default function Valuation() {
                                   key={cIdx}
                                   className={`py-2 text-right font-medium ${
                                     val !== null && dcf && val >= dcf.value_per_share
-                                      ? "text-emerald-500 font-bold bg-emerald-500/5"
+                                      ? "text-accent font-bold bg-emerald-500/5"
                                       : "text-muted-foreground"
                                   }`}
                                 >
@@ -629,7 +503,7 @@ export default function Valuation() {
                     </div>
                     <div className="rounded border border-border p-3 bg-card">
                       <span className="text-[10px] text-muted-foreground font-sans">P90 (Bullish)</span>
-                      <div className="text-lg font-bold text-emerald-500">${mc.p90.toFixed(2)}</div>
+                      <div className="text-lg font-bold text-accent">${mc.p90.toFixed(2)}</div>
                     </div>
                   </div>
                 )}
@@ -639,189 +513,34 @@ export default function Valuation() {
         </div>
       )}
 
-      {/* TAB 2: FCFE MODEL */}
-      {suiteTab === "fcfe" && (
-        <Panel className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-bold">Free Cash Flow to Equity (FCFE) Model</h2>
-              <p className="text-xs text-muted-foreground">
-                FCFE = Net Income + D&A - CapEx - ΔNWC + Net Borrowing • Discounted at Cost of Equity (r_e)
-              </p>
-            </div>
-            <Button size="sm" onClick={() => fcfeMutation.mutate(fcfeParams)}>
-              Recalculate FCFE
-            </Button>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded border border-border p-4 bg-card">
-              <span className="text-xs font-semibold text-muted-foreground">Implied Share Value</span>
-              <div className="text-3xl font-bold font-mono text-primary mt-1">
-                ${Number(fcfeMutation.data?.value_per_share || 188.42).toFixed(2)}
-              </div>
-              <span className="text-xs text-muted-foreground">Direct Equity Value</span>
-            </div>
-            <div className="rounded border border-border p-4 bg-card">
-              <span className="text-xs font-semibold text-muted-foreground">Explicit PV(FCFE)</span>
-              <div className="text-2xl font-bold font-mono mt-1">
-                ${formatNumber(Number(fcfeMutation.data?.pv_explicit_fcfe || 382000), 0)}M
-              </div>
-            </div>
-            <div className="rounded border border-border p-4 bg-card">
-              <span className="text-xs font-semibold text-muted-foreground">Cost of Equity (r_e)</span>
-              <div className="text-2xl font-bold font-mono mt-1">
-                {(fcfeParams.cost_of_equity * 100).toFixed(1)}%
-              </div>
-            </div>
-          </div>
-        </Panel>
-      )}
-
-      {/* TAB 3: COMPARABLE MULTIPLES */}
-      {suiteTab === "comps" && (
-        <Panel className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-bold">Comparable Companies Valuation (Comps)</h2>
-              <p className="text-xs text-muted-foreground">
-                Distribution of peer multiples (EV/EBITDA, P/E, P/B, PEG) and implied company valuation ranges.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-4">
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs text-muted-foreground">25th Percentile Implied</span>
-              <div className="text-xl font-bold font-mono mt-1">
-                ${Number(comps?.implied_share_price_p25 || 155.0).toFixed(2)}
-              </div>
-            </div>
-            <div className="rounded border border-primary/40 p-3.5 bg-card">
-              <span className="text-xs text-muted-foreground">Median Implied Value</span>
-              <div className="text-2xl font-bold font-mono text-primary mt-1">
-                ${Number(comps?.implied_share_price_median || 180.0).toFixed(2)}
-              </div>
-            </div>
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs text-muted-foreground">75th Percentile Implied</span>
-              <div className="text-xl font-bold font-mono mt-1">
-                ${Number(comps?.implied_share_price_p75 || 205.0).toFixed(2)}
-              </div>
-            </div>
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs text-muted-foreground">Peer Count</span>
-              <div className="text-2xl font-bold font-mono mt-1">{peerMultiples.length} Peers</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
-            <span className="text-xs font-semibold text-muted-foreground">Peer Set Multiples:</span>
-            {peerMultiples.map((m, idx) => (
-              <Badge key={idx} tone="neutral" className="font-mono">
-                {m.toFixed(1)}x
-              </Badge>
-            ))}
-          </div>
-        </Panel>
-      )}
-
-      {/* TAB 8: WACC BUILDER */}
-      {suiteTab === "wacc_builder" && (
-        <Panel className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-bold">WACC & CAPM Hurdle Derivation</h2>
-              <p className="text-xs text-muted-foreground">
-                CAPM cost of equity with Blume-adjusted regression beta, FRED risk-free rate, and capital structure weighting.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-4 font-mono">
-            <div className="rounded border border-primary/40 p-3.5 bg-card">
-              <span className="text-xs font-sans text-muted-foreground">Derived WACC</span>
-              <div className="text-2xl font-bold text-primary mt-1">
-                {waccRes?.wacc ? `${(Number(waccRes.wacc) * 100).toFixed(2)}%` : "8.80%"}
-              </div>
-            </div>
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs font-sans text-muted-foreground">Cost of Equity (r_e)</span>
-              <div className="text-xl font-bold mt-1">
-                {waccRes?.cost_of_equity ? `${(Number(waccRes.cost_of_equity) * 100).toFixed(2)}%` : "9.50%"}
-              </div>
-            </div>
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs font-sans text-muted-foreground">Blume Adjusted Beta</span>
-              <div className="text-xl font-bold mt-1">
-                {waccRes?.adjusted_beta ? Number(waccRes.adjusted_beta).toFixed(3) : "1.167"}
-              </div>
-            </div>
-            <div className="rounded border border-border p-3.5 bg-card">
-              <span className="text-xs font-sans text-muted-foreground">FRED 10Y Benchmark</span>
-              <div className="text-xl font-bold mt-1">
-                {waccRes?.risk_free_rate ? `${(Number(waccRes.risk_free_rate) * 100).toFixed(2)}%` : "4.35%"}
-              </div>
-            </div>
-          </div>
-        </Panel>
-      )}
-
-      {/* TAB 9: FOOTBALL FIELD CHART */}
-      {suiteTab === "football_field" && (
-        <Panel className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-bold">Football Field Valuation Summary</h2>
-              <p className="text-xs text-muted-foreground">
-                Consolidated implied share price ranges across intrinsic, relative, and transactional valuation methodologies.
-              </p>
-            </div>
-            <Badge tone="accent">Current Price: $185.00</Badge>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            {(ff?.ranges || [
-              { method_id: "dcf_fcff", label: "DCF (FCFF)", low: 165.0, base: 193.0, high: 220.0 },
-              { method_id: "fcfe", label: "FCFE Model", low: 160.0, base: 188.0, high: 215.0 },
-              { method_id: "comps_ebitda", label: "Comps EV/EBITDA", low: 155.0, base: 180.0, high: 210.0 },
-              { method_id: "ddm", label: "DDM Multi-Stage", low: 140.0, base: 170.0, high: 195.0 },
-              { method_id: "precedents", label: "Precedent Deals", low: 175.0, base: 200.0, high: 235.0 },
-            ]).map((r) => {
-              const minVal = 120;
-              const maxVal = 250;
-              const rangeSpan = maxVal - minVal;
-              const leftPct = ((r.low - minVal) / rangeSpan) * 100;
-              const widthPct = ((r.high - r.low) / rangeSpan) * 100;
-              const basePct = ((r.base - minVal) / rangeSpan) * 100;
-
-              return (
-                <div key={r.method_id} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="font-semibold">{r.label}</span>
-                    <span className="font-mono text-muted-foreground">
-                      ${r.low.toFixed(0)} - ${r.high.toFixed(0)} (Base: ${r.base.toFixed(0)})
-                    </span>
-                  </div>
-                  <div className="relative h-6 rounded bg-neutral-900 border border-neutral-800 overflow-hidden">
-                    {/* Floating bar range */}
-                    <div
-                      className="absolute top-1 bottom-1 rounded bg-brand-500/30 border border-brand-400"
-                      style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    />
-                    {/* Base marker */}
-                    <div
-                      className="absolute top-0 bottom-0 w-1 bg-white"
-                      style={{ left: `${basePct}%` }}
-                      title={`Base: $${r.base}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      )}
+      {suiteTab !== "dcf" && <ModelInputs key={suiteTab} method={suiteTab} />}
     </div>
   );
+}
+
+const modelMethods = {
+  fcfe: queries.runFcfe, comps: queries.runComps, ddm: queries.runDdm,
+  residual_income: queries.runResidualIncome, sotp: queries.runSotp,
+  precedents: queries.runPrecedents, wacc_builder: queries.deriveWacc,
+  football_field: queries.runFootballField,
+};
+
+function ModelInputs({ method }: { method: keyof typeof modelMethods }) {
+  const [inputs, setInputs] = useState("");
+  const calculation = useMutation({
+    mutationFn: async () => {
+      const values = JSON.parse(inputs);
+      if (!values || Array.isArray(values) || typeof values !== "object") throw new Error("Enter a JSON object with model assumptions.");
+      return modelMethods[method](values);
+    },
+  });
+  return <Panel className="space-y-3 p-5">
+    <label className="block" htmlFor="model-inputs">Model assumptions (JSON)</label>
+    <p>Enter your sourced inputs and forecast assumptions. <a href="/docs" target="_blank" rel="noreferrer">API field reference</a></p>
+    <textarea id="model-inputs" value={inputs} onChange={event => setInputs(event.target.value)}
+      className="w-full rounded border border-line bg-panel p-3 font-mono" rows={8} />
+    <Button disabled={!inputs.trim() || calculation.isPending} onClick={() => calculation.mutate()}>Calculate model</Button>
+    {calculation.error && <p role="alert">{calculation.error.message}</p>}
+    {calculation.data && <pre className="overflow-auto">{JSON.stringify(calculation.data, null, 2)}</pre>}
+  </Panel>;
 }

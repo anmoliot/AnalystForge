@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 import io
 import uuid
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
 import httpx
 import pytest
 from sqlalchemy import select
@@ -18,11 +19,21 @@ async def _seed_portfolio_prices(db: Database, tickers: list[str]) -> None:
     async with db.session() as session:
         ex = await session.get(Exchange, "NASDAQ")
         if not ex:
-            session.add(Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD"))
+            session.add(
+                Exchange(
+                    code="NASDAQ",
+                    name="Nasdaq",
+                    country="US",
+                    timezone="America/New_York",
+                    currency="USD",
+                )
+            )
             await session.flush()
 
         for ticker in tickers:
-            inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+            inst = (
+                await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+            ).scalar_one_or_none()
             if not inst:
                 inst = Instrument(
                     id=uuid.uuid4(),
@@ -40,7 +51,9 @@ async def _seed_portfolio_prices(db: Database, tickers: list[str]) -> None:
             # Seed 30 daily price bars with distinct variations per ticker
             start_dt = datetime(2024, 1, 1, tzinfo=UTC)
             ticker_mult = {"AAPL": 0.8, "MSFT": 1.4, "GOOGL": 0.5, "AMZN": 1.1}.get(ticker, 1.0)
-            base_p = {"AAPL": 150.0, "MSFT": 350.0, "GOOGL": 140.0, "AMZN": 170.0}.get(ticker, 100.0)
+            base_p = {"AAPL": 150.0, "MSFT": 350.0, "GOOGL": 140.0, "AMZN": 170.0}.get(
+                ticker, 100.0
+            )
             for i in range(30):
                 dt = start_dt + timedelta(days=i)
                 noise = ((i % 5) - 2) * 0.7 * ticker_mult

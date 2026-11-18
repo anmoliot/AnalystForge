@@ -47,6 +47,8 @@ class Settings(BaseSettings):
 
     access_token_minutes: int = Field(default=15, ge=1, le=1440)
     refresh_token_days: int = Field(default=30, ge=1, le=365)
+    rate_limit_per_minute: int = Field(default=240, ge=1)
+    rate_limit_auth_per_minute: int = Field(default=10, ge=1)
     max_login_attempts: int = Field(default=5, ge=1, le=100)
     login_lockout_minutes: int = Field(default=15, ge=1)
 

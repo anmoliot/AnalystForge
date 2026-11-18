@@ -5,6 +5,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        background: "rgb(var(--canvas) / <alpha-value>)",
+        foreground: "rgb(var(--ink) / <alpha-value>)",
+        card: "rgb(var(--panel) / <alpha-value>)",
+        border: "rgb(var(--line) / <alpha-value>)",
+        primary: "rgb(var(--accent) / <alpha-value>)",
+        "primary-foreground": "rgb(var(--accent-ink) / <alpha-value>)",
+        "muted-foreground": "rgb(var(--muted) / <alpha-value>)",
         canvas: "rgb(var(--canvas) / <alpha-value>)",
         panel: "rgb(var(--panel) / <alpha-value>)",
         elevated: "rgb(var(--elevated) / <alpha-value>)",

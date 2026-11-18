@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import uuid
 import httpx
 import pytest
-from sqlalchemy import select
-
-from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, TOTPSecret, Tenant, User
 
 
 @pytest.mark.asyncio
@@ -235,4 +231,3 @@ async def test_refresh_token_reuse_attack_rejected(client: httpx.AsyncClient) ->
     ref2 = await client.post("/api/v1/auth/refresh")
     assert ref2.status_code == 401
     assert "already used" in ref2.json()["error"]["message"]
-

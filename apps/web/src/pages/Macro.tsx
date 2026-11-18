@@ -125,10 +125,10 @@ export default function Macro() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Globe className="h-6 w-6 text-brand-400" />
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Macroeconomic Dashboard</h1>
+            <Globe className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Macroeconomic Dashboard</h1>
           </div>
-          <p className="mt-1 text-sm text-neutral-400">
+          <p className="mt-1 text-sm text-muted">
             Yield curve structure, central bank policy rates, foreign exchange, and key economic indicators.
           </p>
         </div>
@@ -146,16 +146,16 @@ export default function Macro() {
       {/* Warning banner when FRED key is not configured */}
       {!isFredConfigured && (
         <div
-          className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4 text-amber-200"
+          className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4 text-warning"
           data-testid="fred-not-configured-banner"
         >
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
             <div>
-              <p className="font-medium text-amber-300">FRED key not configured</p>
-              <p className="text-xs text-amber-400/80 mt-0.5">
-                Set <code className="bg-amber-900/50 px-1 py-0.5 rounded text-amber-200">FRED_API_KEY</code> in{" "}
-                <code className="bg-amber-900/50 px-1 py-0.5 rounded text-amber-200">.env</code> to ingest live Federal Reserve economic data and complete US Treasury yield curve tenors.
+              <p className="font-medium text-warning">FRED key not configured</p>
+              <p className="text-xs text-warning/80 mt-0.5">
+                Set <code className="bg-amber-900/50 px-1 py-0.5 rounded text-warning">FRED_API_KEY</code> in{" "}
+                <code className="bg-amber-900/50 px-1 py-0.5 rounded text-warning">.env</code> to ingest live Federal Reserve economic data and complete US Treasury yield curve tenors.
               </p>
             </div>
           </div>
@@ -167,8 +167,8 @@ export default function Macro() {
         <Panel className="p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-medium text-white">US Treasury Yield Curve</h2>
-              <p className="text-xs text-neutral-400">
+              <h2 className="text-base font-medium text-ink">US Treasury Yield Curve</h2>
+              <p className="text-xs text-muted">
                 Term structure of benchmark sovereign yields{" "}
                 {curveAsOf ? `(As of ${curveAsOf})` : "(No observations ingested)"}
               </p>
@@ -218,12 +218,12 @@ export default function Macro() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center text-center text-neutral-400 p-6">
-                <Info className="h-8 w-8 text-neutral-500 mb-2" />
-                <p className="text-sm font-medium text-neutral-300">
+              <div className="flex h-full flex-col items-center justify-center text-center text-muted p-6">
+                <Info className="h-8 w-8 text-muted mb-2" />
+                <p className="text-sm font-medium text-ink">
                   {isLoadingCurve ? "Loading yield curve data..." : (yieldCurve?.message || "Yield curve data unavailable")}
                 </p>
-                <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                <p className="text-xs text-muted mt-1 max-w-sm">
                   Run macro ingestion with a configured FRED key to populate benchmark Treasury tenors.
                 </p>
               </div>
@@ -234,22 +234,22 @@ export default function Macro() {
         {/* Spread & Key Metrics */}
         <div className="space-y-4">
           <Panel className="p-5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               10Y - 2Y Yield Spread
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               {spread !== null && spread !== undefined ? (
                 <>
-                  <span className={`text-3xl font-bold font-mono ${spread < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                  <span className={`text-3xl font-bold font-mono ${spread < 0 ? "text-negative" : "text-accent"}`}>
                     {spread >= 0 ? `+${(spread * 100).toFixed(0)} bps` : `${(spread * 100).toFixed(0)} bps`}
                   </span>
-                  <span className="text-xs text-neutral-400">({spread.toFixed(2)}%)</span>
+                  <span className="text-xs text-muted">({spread.toFixed(2)}%)</span>
                 </>
               ) : (
-                <span className="text-lg font-mono text-neutral-500">Unavailable</span>
+                <span className="text-lg font-mono text-muted">Unavailable</span>
               )}
             </div>
-            <p className="mt-2 text-xs text-neutral-400">
+            <p className="mt-2 text-xs text-muted">
               {spread !== null && spread !== undefined
                 ? spread < 0
                   ? "Curve inversion indicates heightened market anticipation of economic deceleration."
@@ -259,15 +259,15 @@ export default function Macro() {
           </Panel>
 
           <Panel className="p-5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               Benchmark 10-Year
             </span>
-            <div className="mt-2 text-3xl font-bold font-mono text-white">
+            <div className="mt-2 text-3xl font-bold font-mono text-ink">
               {curvePoints.find((c) => c.tenor === "10Y")?.rate !== undefined
                 ? `${curvePoints.find((c) => c.tenor === "10Y")?.rate?.toFixed(2)}%`
                 : "—"}
             </div>
-            <p className="mt-1 text-xs text-neutral-400">
+            <p className="mt-1 text-xs text-muted">
               Global risk-free hurdle discount rate used across DCF valuations {curveAsOf ? `(as of ${curveAsOf})` : ""}.
             </p>
           </Panel>
@@ -280,8 +280,8 @@ export default function Macro() {
         <Panel className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-brand-400" />
-              <h2 className="text-base font-medium text-white">Foreign Exchange</h2>
+              <DollarSign className="h-5 w-5 text-accent" />
+              <h2 className="text-base font-medium text-ink">Foreign Exchange</h2>
             </div>
             <Badge tone="neutral">{fxRates.length} Pairs</Badge>
           </div>
@@ -291,11 +291,11 @@ export default function Macro() {
               {fxRates.map((fx) => (
                 <div key={fx.pair} className="flex items-center justify-between py-2.5">
                   <div>
-                    <span className="font-semibold text-sm text-white">{fx.pair}</span>
-                    <p className="text-xs text-neutral-400">As of {fx.date}</p>
+                    <span className="font-semibold text-sm text-ink">{fx.pair}</span>
+                    <p className="text-xs text-muted">As of {fx.date}</p>
                   </div>
                   <div className="text-right">
-                    <span className="font-mono text-sm font-semibold text-neutral-100">
+                    <span className="font-mono text-sm font-semibold text-ink">
                       {fx.rate.toFixed(4)}
                     </span>
                   </div>
@@ -303,7 +303,7 @@ export default function Macro() {
               ))}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-neutral-500">
+            <div className="py-8 text-center text-xs text-muted">
               No FX exchange rates ingested yet.
             </div>
           )}
@@ -313,8 +313,8 @@ export default function Macro() {
         <Panel className="p-5 lg:col-span-2">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-medium text-white">Indicator Series Explorer</h2>
-              <p className="text-xs text-neutral-400">
+              <h2 className="text-base font-medium text-ink">Indicator Series Explorer</h2>
+              <p className="text-xs text-muted">
                 Official macroeconomic series from FRED & sovereign providers
                 {seriesDetail?.as_of ? ` (As of ${seriesDetail.as_of})` : ""}
               </p>
@@ -323,7 +323,7 @@ export default function Macro() {
               <select
                 value={selectedSeries}
                 onChange={(e) => setSelectedSeries(e.target.value)}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-100 focus:border-brand-500 focus:outline-none"
+                className="rounded-md border border-neutral-700 bg-elevated px-3 py-1.5 text-xs text-ink focus:border-brand-500 focus:outline-none"
                 data-testid="macro-series-select"
               >
                 {macroSeries.map((s) => (
@@ -357,12 +357,12 @@ export default function Macro() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex h-60 flex-col items-center justify-center text-neutral-400 text-sm p-4 text-center">
-              <Info className="h-6 w-6 text-neutral-500 mb-2" />
-              <p className="font-medium text-neutral-300">
+            <div className="flex h-60 flex-col items-center justify-center text-muted text-sm p-4 text-center">
+              <Info className="h-6 w-6 text-muted mb-2" />
+              <p className="font-medium text-ink">
                 {isLoadingDetail ? "Loading series observations..." : "No series observations recorded"}
               </p>
-              <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+              <p className="text-xs text-muted mt-1 max-w-sm">
                 Series data is ingested through the macro worker job from the Federal Reserve Economic Data API.
               </p>
             </div>

@@ -6,14 +6,14 @@ backtests, or valuations that can be viewed publicly without authentication befo
 
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
-from sqlalchemy.orm import selectinload
 
 from analystforge.api.deps import CurrentUser, SessionDep
 from analystforge.api.errors import NotFoundError
@@ -39,7 +39,7 @@ async def create_share_link(
     current_user: CurrentUser,
     session: SessionDep,
 ) -> dict[str, Any]:
-    expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days)
+    expires_at = datetime.now(UTC) + timedelta(days=payload.expires_in_days)
 
     link = ShareLink(
         tenant_id=current_user.tenant_id,
@@ -75,21 +75,21 @@ async def list_share_links(
         .order_by(desc(ShareLink.created_at))
     )
     links = (await session.execute(stmt)).scalars().all()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         {
-            "id": str(l.id),
-            "token": l.token,
-            "resource_type": l.resource_type,
-            "resource_id": l.resource_id,
-            "expires_at": l.expires_at.isoformat(),
-            "is_active": l.is_active,
-            "is_expired": l.expires_at < now,
-            "view_count": l.view_count,
-            "share_url": f"/public/shares/{l.token}",
-            "created_at": l.created_at.isoformat(),
+            "id": str(item.id),
+            "token": item.token,
+            "resource_type": item.resource_type,
+            "resource_id": item.resource_id,
+            "expires_at": item.expires_at.isoformat(),
+            "is_active": item.is_active,
+            "is_expired": item.expires_at < now,
+            "view_count": item.view_count,
+            "share_url": f"/public/shares/{item.token}",
+            "created_at": item.created_at.isoformat(),
         }
-        for l in links
+        for item in links
     ]
 
 
@@ -106,7 +106,9 @@ async def revoke_share_link(
     await session.commit()
 
 
-@public_share_router.get("/{token}", summary="Public unauthenticated read-only resource retrieval via share token")
+@public_share_router.get(
+    "/{token}", summary="Public unauthenticated read-only resource retrieval via share token"
+)
 async def view_shared_resource(
     token: str,
     session: SessionDep,
@@ -115,11 +117,13 @@ async def view_shared_resource(
     link = (await session.execute(stmt)).scalar_one_or_none()
 
     if not link or not link.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Share link not found or inactive.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Share link not found or inactive."
+        )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Check expiry
-    exp = link.expires_at if link.expires_at.tzinfo else link.expires_at.replace(tzinfo=timezone.utc)
+    exp = link.expires_at if link.expires_at.tzinfo else link.expires_at.replace(tzinfo=UTC)
     if exp < now:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
@@ -137,8 +141,14 @@ async def view_shared_resource(
             p_uuid = uuid.UUID(link.resource_id)
             p = await session.get(Portfolio, p_uuid)
             if p:
-                res_data = {"id": str(p.id), "name": p.name, "description": p.description, "base_currency": p.base_currency}
-        except Exception:
+                res_data = {
+                    "id": str(p.id),
+                    "name": p.name,
+                    "description": p.description,
+                    "base_currency": p.base_currency,
+                }
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             pass
 
     elif link.resource_type == "screen":
@@ -146,8 +156,14 @@ async def view_shared_resource(
             s_uuid = uuid.UUID(link.resource_id)
             s = await session.get(SavedScreen, s_uuid)
             if s:
-                res_data = {"id": str(s.id), "name": s.name, "description": s.description, "filters": s.filters}
-        except Exception:
+                res_data = {
+                    "id": str(s.id),
+                    "name": s.name,
+                    "description": s.description,
+                    "filters": s.filters,
+                }
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             pass
 
     elif link.resource_type == "backtest":
@@ -163,7 +179,8 @@ async def view_shared_resource(
                     "sharpe_ratio": float(b.sharpe_ratio) if b.sharpe_ratio else None,
                     "equity_curve": b.equity_curve,
                 }
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             pass
 
     elif link.resource_type == "valuation":
@@ -171,8 +188,14 @@ async def view_shared_resource(
             v_uuid = uuid.UUID(link.resource_id)
             v = await session.get(ValuationModel, v_uuid)
             if v:
-                res_data = {"id": str(v.id), "name": v.name, "ticker": v.ticker, "model_type": v.model_type}
-        except Exception:
+                res_data = {
+                    "id": str(v.id),
+                    "name": v.name,
+                    "ticker": v.ticker,
+                    "model_type": v.model_type,
+                }
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             pass
 
     return {

@@ -3,20 +3,19 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
 from analystforge.api.config import Settings, get_settings
 from analystforge.api.deps import CurrentUser, SessionDep
-from analystforge.api.models.market import Instrument
+from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.api.models.reporting import ReportArtifact
 from analystforge.api.services.alerts import send_alert_email
 from analystforge.api.services.reports import (
-    REPORT_TEMPLATES,
     SUPPORTED_FORMATS,
     build_report_file,
     generate_markdown_report,
@@ -27,9 +26,14 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 class ReportGenerateRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=255)
-    report_type: str = Field(..., description="TEARSHEET | VALUATION_SUMMARY | DCF_SUMMARY | PORTFOLIO_REVIEW | PORTFOLIO_RISK | BACKTEST_PERFORMANCE")
+    report_type: str = Field(
+        ...,
+        description="TEARSHEET | VALUATION_SUMMARY | DCF_SUMMARY | PORTFOLIO_REVIEW | PORTFOLIO_RISK | BACKTEST_PERFORMANCE",
+    )
     ticker: str | None = None
-    format: str = Field(default="PDF", description="PDF | PPTX | EXCEL | XLSX | CSV | JSON | MARKDOWN")
+    format: str = Field(
+        default="PDF", description="PDF | PPTX | EXCEL | XLSX | CSV | JSON | MARKDOWN"
+    )
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -59,29 +63,40 @@ async def generate_report(
         instrument = (await session.execute(inst_stmt)).scalar_one_or_none()
 
     company_name = instrument.name if instrument else (ticker_clean or "Market Universe")
-    as_of = date.today().isoformat()
+    as_of = datetime.now(UTC).date().isoformat()
 
+    latest = None
+    if instrument:
+        latest = await session.scalar(
+            select(PriceBar)
+            .where(PriceBar.instrument_id == instrument.id, PriceBar.interval == "1d")
+            .order_by(PriceBar.ts.desc())
+            .limit(1)
+        )
+    metrics = []
+    if latest is not None and instrument is not None:
+        metrics.append(
+            (
+                "Closing price",
+                f"{latest.close} {instrument.currency}",
+                latest.provider,
+                latest.ts.date().isoformat(),
+            )
+        )
+    summary = (
+        f"Latest recorded daily close for {company_name}, sourced from {latest.provider}."
+        if latest
+        else f"Price metrics unavailable for {company_name}. No daily close was found."
+    )
     report_data: dict[str, Any] = {
         "ticker": ticker_clean or "N/A",
         "company_name": company_name,
         "as_of": as_of,
         "analyst": current_user.full_name,
         "parameters": payload.parameters,
-        "summary": (
-            f"Institutional research coverage for {company_name} ({ticker_clean or 'N/A'}). "
-            f"Synthesizes canonical price history, audited XBRL statements, and quantitative factor models."
-        ),
-        "risks": (
-            "Operational risks encompass global supply chains, foreign currency fluctuations, "
-            "monetary policy rate shifts, and industry competitive dynamics."
-        ),
-        "metrics": [
-            ("Market Capitalization", "$2.85T", "P/E Trailing", "28.4x"),
-            ("Revenue (TTM)", "$391.0B", "EV / EBITDA", "21.2x"),
-            ("Gross Margin", "46.2%", "ROE", "147.5%"),
-            ("Operating Margin", "31.4%", "Debt / Equity", "1.45x"),
-            ("Free Cash Flow (TTM)", "$108.8B", "Dividend Yield", "0.55%"),
-        ],
+        "summary": summary,
+        "risks": "Risk assessment unavailable. No risk analysis was attached to this report.",
+        "metrics": metrics,
     }
 
     # Markdown preview representation for persistence
@@ -204,7 +219,7 @@ async def download_report_document(
     report_data = meta.get("report_data") or {
         "ticker": artifact.ticker,
         "company_name": artifact.ticker or "Asset",
-        "as_of": meta.get("as_of", date.today().isoformat()),
+        "as_of": meta.get("as_of", datetime.now(UTC).date().isoformat()),
         "analyst": meta.get("analyst", "AnalystForge"),
         "summary": artifact.content or "",
     }
@@ -248,7 +263,7 @@ async def email_report_document(
     report_data = meta.get("report_data") or {
         "ticker": artifact.ticker,
         "company_name": artifact.ticker or "Asset",
-        "as_of": meta.get("as_of", date.today().isoformat()),
+        "as_of": meta.get("as_of", datetime.now(UTC).date().isoformat()),
         "analyst": meta.get("analyst", current_user.full_name),
         "summary": artifact.content or "",
     }

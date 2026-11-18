@@ -6,9 +6,9 @@ comparisons against historical OHLCV data to generate boolean signal masks.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from analystforge.quant.backtest.indicators import (
@@ -21,7 +21,9 @@ from analystforge.quant.backtest.indicators import (
 )
 
 
-def _compute_indicator_series(df: pd.DataFrame, indicator_spec: Mapping[str, Any]) -> pd.Series[float]:
+def _compute_indicator_series(
+    df: pd.DataFrame, indicator_spec: Mapping[str, Any]
+) -> pd.Series[float]:
     """Calculate an indicator series from specification dictionary."""
     name = str(indicator_spec.get("name", "CLOSE")).upper()
     params = indicator_spec.get("params", {})

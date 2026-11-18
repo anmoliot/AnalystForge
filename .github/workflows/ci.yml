@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -36,8 +40,6 @@ jobs:
           --health-retries 20
     env:
       ENVIRONMENT: test
-      SECRET_KEY: ci-secret-key-that-is-long-enough-for-validation-32
-      ENCRYPTION_KEY: 5nH1r0LzRk0m3xE4zQ9k7aLbV0uJ8Yw2cT6pS1dF3gM=
       DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_test
       TEST_DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_test
       REDIS_URL: redis://localhost:6379/0
@@ -49,6 +51,8 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --all-packages
+      - name: Generate ephemeral test signing key
+        run: python -c "import os,secrets; open(os.environ['GITHUB_ENV'],'a').write('SECRET_KEY='+secrets.token_hex(32)+'\n')"
       - name: Ruff lint
         run: uv run ruff check .
       - name: Ruff format check
@@ -58,7 +62,7 @@ jobs:
       - name: Migrations
         run: uv run alembic -c apps/api/alembic.ini upgrade head
       - name: Pytest
-        run: uv run pytest --cov=analystforge --cov-report=term-missing --cov-report=xml
+        run: uv run pytest --cov=analystforge.quant --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=95
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -80,6 +84,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run
@@ -88,25 +93,113 @@ jobs:
   docker:
     name: Docker images build
     runs-on: ubuntu-latest
-    needs: [python, web]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            file: infra/docker/api.Dockerfile
+          - image: web
+            file: apps/web/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build API image
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
-          file: infra/docker/api.Dockerfile
-          push: false
-          tags: analystforge-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Build web image
-        uses: docker/build-push-action@v6
+          file: ${{ matrix.file }}
+          load: true
+          tags: analystforge-${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          context: .
-          file: apps/web/Dockerfile
-          push: false
-          tags: analystforge-web:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          image-ref: analystforge-${{ matrix.image }}:ci
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: json
+          output: trivy.json
+          scanners: vuln
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: trivy-${{ matrix.image }}
+          path: trivy.json
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv export --locked --all-packages --no-emit-workspace --no-hashes -o "$RUNNER_TEMP/dependencies.txt"
+      - run: uvx --python 3.12 pip-audit --no-deps --disable-pip -r "$RUNNER_TEMP/dependencies.txt" -f json -o pip-audit.json
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: python-advisories
+          path: pip-audit.json
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.24.3 git --redact --log-opts=--all /repo
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: analystforge
+          POSTGRES_PASSWORD: analystforge_test
+          POSTGRES_DB: analystforge_e2e_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://analystforge:analystforge_test@localhost:5432/analystforge_e2e_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --all-packages --python 3.12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-audit
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+            docs/screenshots/wp10-*.png
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --all-packages --python 3.12
+      - uses: grafana/setup-k6-action@v1
+      - name: Run smoke profile against isolated database
+        run: |
+          uv run python tests/e2e/server.py &
+          api_pid=$!
+          trap 'kill "$api_pid"' EXIT
+          curl --retry 60 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:8765/health
+          k6 run --summary-export=smoke.json tests/load/smoke.js
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: k6-smoke
+          path: smoke.json

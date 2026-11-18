@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
-from analystforge.quant.money import ONE, ZERO, discount_factor, quantize, to_decimal
+from analystforge.quant.money import ONE, ZERO, discount_factor, quantize
 
 
 class TerminalValueMethod(StrEnum):
@@ -139,7 +139,8 @@ def fcfe_valuation(assumptions: FCFEAssumptions) -> FCFEResult:
     if assumptions.terminal_method is TerminalValueMethod.GORDON_GROWTH:
         final_fcfe = final_forecast.fcfe
         terminal_value = (
-            final_fcfe * (ONE + assumptions.terminal_growth)
+            final_fcfe
+            * (ONE + assumptions.terminal_growth)
             / (assumptions.cost_of_equity - assumptions.terminal_growth)
         )
     else:

@@ -122,7 +122,7 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400">
+          <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-negative">
             {error}
           </div>
         )}
@@ -136,13 +136,13 @@ export default function Login() {
                 </label>
                 <div className="relative">
                   <Building className="absolute left-3 top-2.5 size-4 text-muted" />
-                  <input
+                  <input aria-label="Organization / Firm Name"
                     type="text"
                     required
                     value={tenantName}
                     onChange={(e) => setTenantName(e.target.value)}
                     placeholder="e.g. Apex Capital Management"
-                    className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                    className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
@@ -153,13 +153,13 @@ export default function Login() {
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 size-4 text-muted" />
-                  <input
+                  <input aria-label="Full Name"
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Jane Doe"
-                    className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                    className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
@@ -172,13 +172,13 @@ export default function Login() {
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-2.5 size-4 text-muted" />
-              <input
+              <input aria-label="Corporate Email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="analyst@hedgefund.com"
-                className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
               />
             </div>
           </div>
@@ -189,13 +189,13 @@ export default function Login() {
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 size-4 text-muted" />
-              <input
+              <input aria-label="Password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                className="w-full rounded border border-line bg-elevated py-2 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
               />
             </div>
           </div>
@@ -204,17 +204,17 @@ export default function Login() {
             <div>
               <div className="flex items-center justify-between">
                 <label className="mb-1 block text-2xs font-medium uppercase tracking-wider text-muted">
-                  2FA Authenticator Code <span className="text-muted/50">(optional)</span>
+                  2FA Authenticator Code <span className="text-muted">(optional)</span>
                 </label>
                 <Badge tone="neutral">6 digits</Badge>
               </div>
-              <input
+              <input aria-label="2FA Authenticator Code (optional)"
                 type="text"
                 maxLength={6}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value)}
                 placeholder="123456"
-                className="w-full rounded border border-line bg-elevated py-2 px-3 font-mono text-xs text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                className="w-full rounded border border-line bg-elevated py-2 px-3 font-mono text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
               />
             </div>
           )}

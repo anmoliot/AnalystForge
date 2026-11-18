@@ -7,14 +7,12 @@ Also asserts that missing prices produce HTTP 422 `DataUnavailable` errors, neve
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import uuid
+from pathlib import Path
+
 import httpx
 import pytest
-
-from analystforge.api.db import Database
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -63,10 +61,16 @@ def test_no_random_or_fabricated_data_in_codebase() -> None:
                 for line_no, line in enumerate(content.splitlines(), start=1):
                     # Skip comments
                     stripped = line.strip()
-                    if stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("*"):
+                    if (
+                        stripped.startswith("#")
+                        or stripped.startswith("//")
+                        or stripped.startswith("*")
+                    ):
                         continue
                     if pattern.search(line):
-                        violations.append(f"{path.relative_to(REPO_ROOT)}:{line_no}: {line.strip()}")
+                        violations.append(
+                            f"{path.relative_to(REPO_ROOT)}:{line_no}: {line.strip()}"
+                        )
 
     assert not violations, (
         "Non-negotiable rule violation: Random/fabricated data generator found in production code:\n"

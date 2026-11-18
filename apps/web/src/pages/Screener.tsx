@@ -36,7 +36,7 @@ export interface ScreenResultItem {
   currency: string;
   sector: string;
   industry: string;
-  latest_price: number | null;
+  price: number | null;
   pe_ratio: number | null;
   pb_ratio: number | null;
   roe: number | null;
@@ -111,87 +111,8 @@ export default function Screener() {
 
   const screenMutation = useMutation({
     mutationFn: async (crit: ScreenFilterCriteria) => {
-      try {
-        const res = await api.post<{ items: ScreenResultItem[]; total: number }>(
-          "/api/v1/screener/run",
-          crit
-        );
-        return res.items;
-      } catch {
-        // Fallback for demo when backend items are sparse
-        return [
-          {
-            id: "1",
-            ticker: "NVDA",
-            name: "NVIDIA Corporation",
-            exchange: "XNAS",
-            currency: "USD",
-            sector: "Technology",
-            industry: "Semiconductors",
-            latest_price: 135.5,
-            pe_ratio: 45.2,
-            pb_ratio: 32.1,
-            roe: 0.88,
-            market_cap: 3350000000000,
-          },
-          {
-            id: "2",
-            ticker: "AAPL",
-            name: "Apple Inc.",
-            exchange: "XNAS",
-            currency: "USD",
-            sector: "Technology",
-            industry: "Consumer Electronics",
-            latest_price: 228.4,
-            pe_ratio: 32.4,
-            pb_ratio: 48.0,
-            roe: 1.45,
-            market_cap: 3450000000000,
-          },
-          {
-            id: "3",
-            ticker: "MSFT",
-            name: "Microsoft Corporation",
-            exchange: "XNAS",
-            currency: "USD",
-            sector: "Technology",
-            industry: "Software - Infrastructure",
-            latest_price: 425.0,
-            pe_ratio: 35.8,
-            pb_ratio: 12.3,
-            roe: 0.38,
-            market_cap: 3150000000000,
-          },
-          {
-            id: "4",
-            ticker: "AZN.L",
-            name: "AstraZeneca PLC",
-            exchange: "XLON",
-            currency: "GBp",
-            sector: "Healthcare",
-            industry: "Pharmaceuticals",
-            latest_price: 10450.0,
-            pe_ratio: 31.0,
-            pb_ratio: 4.8,
-            roe: 0.16,
-            market_cap: 160000000000,
-          },
-          {
-            id: "5",
-            ticker: "SAP.DE",
-            name: "SAP SE",
-            exchange: "XETR",
-            currency: "EUR",
-            sector: "Technology",
-            industry: "Software - Application",
-            latest_price: 215.2,
-            pe_ratio: 42.1,
-            pb_ratio: 5.6,
-            roe: 0.14,
-            market_cap: 250000000000,
-          },
-        ];
-      }
+      return api.post<ScreenResultItem[]>("/api/v1/screener/run", { ...crit, exchange_code: crit.exchange });
+
     },
   });
 
@@ -281,7 +202,7 @@ export default function Screener() {
       `"${r.name.replace(/"/g, '""')}"`,
       r.exchange,
       r.sector,
-      r.latest_price ?? "",
+      r.price ?? "",
       r.currency,
       r.pe_ratio ?? "",
       r.pb_ratio ?? "",
@@ -300,14 +221,15 @@ export default function Screener() {
 
   return (
     <div className="space-y-6">
+      {screenMutation.error && <p role="alert">Screen unavailable. {screenMutation.error.message}</p>}
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-6 w-6 text-brand-400" />
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Equity Screener</h1>
+            <SlidersHorizontal className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Equity Screener</h1>
           </div>
-          <p className="mt-1 text-sm text-neutral-400">
+          <p className="mt-1 text-sm text-muted">
             Filter cross-exchange equities by valuation multiples, quality metrics, and sector classification.
           </p>
         </div>
@@ -345,14 +267,14 @@ export default function Screener() {
 
       {/* Preset Pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted">
           Presets:
         </span>
         {Object.entries(PRESETS).map(([k, p]) => (
           <button
             key={k}
             onClick={() => handleApplyPreset(k)}
-            className="rounded-full border border-neutral-700 bg-neutral-800/80 px-3 py-1 text-xs text-neutral-200 transition hover:border-brand-500 hover:text-white"
+            className="rounded-full border border-neutral-700 bg-elevated/80 px-3 py-1 text-xs text-ink transition hover:border-brand-500 hover:text-ink"
           >
             {p.name}
           </button>
@@ -371,7 +293,7 @@ export default function Screener() {
               setMinMarketCap(s.criteria.min_market_cap?.toString() || "");
               screenMutation.mutate(s.criteria);
             }}
-            className="flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-500/10 px-3 py-1 text-xs text-brand-300 transition hover:border-brand-400 hover:text-white"
+            className="flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-500/10 px-3 py-1 text-xs text-accent transition hover:border-brand-400 hover:text-ink"
           >
             <span>{s.name}</span>
           </button>
@@ -381,12 +303,12 @@ export default function Screener() {
       {/* Criteria Filter Panel */}
       <Panel className="p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-300">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink">
             Filter Parameters
           </h2>
           <button
             onClick={handleReset}
-            className="text-xs text-neutral-400 hover:text-white"
+            className="text-xs text-muted hover:text-ink"
           >
             Reset Filters
           </button>
@@ -394,11 +316,11 @@ export default function Screener() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">Sector</label>
-            <select
+            <label className="block text-xs font-medium text-muted mb-1">Sector</label>
+            <select aria-label="Sector"
               value={sector}
               onChange={(e) => setSector(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
               data-testid="filter-sector"
             >
               <option value="">All Sectors</option>
@@ -412,11 +334,11 @@ export default function Screener() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">Exchange</label>
-            <select
+            <label className="block text-xs font-medium text-muted mb-1">Exchange</label>
+            <select aria-label="Exchange"
               value={exchange}
               onChange={(e) => setExchange(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
               data-testid="filter-exchange"
             >
               <option value="">All Exchanges</option>
@@ -428,62 +350,62 @@ export default function Screener() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">P/E Ratio (Max)</label>
-            <input
+            <label className="block text-xs font-medium text-muted mb-1">P/E Ratio (Max)</label>
+            <input aria-label="P/E Ratio (Max)"
               type="number"
               placeholder="e.g. 25"
               value={maxPe}
               onChange={(e) => setMaxPe(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
               data-testid="filter-max-pe"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">Min ROE (%)</label>
-            <input
+            <label className="block text-xs font-medium text-muted mb-1">Min ROE (%)</label>
+            <input aria-label="Min ROE (%)"
               type="number"
               step="0.01"
               placeholder="e.g. 0.15 for 15%"
               value={minRoe}
               onChange={(e) => setMinRoe(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
               data-testid="filter-min-roe"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">Min Price</label>
-            <input
+            <label className="block text-xs font-medium text-muted mb-1">Min Price</label>
+            <input aria-label="Min Price"
               type="number"
               placeholder="Min Price"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-400 mb-1">Max Price</label>
-            <input
+            <label className="block text-xs font-medium text-muted mb-1">Max Price</label>
+            <input aria-label="Max Price"
               type="number"
               placeholder="Max Price"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-neutral-400 mb-1">
+            <label className="block text-xs font-medium text-muted mb-1">
               Min Market Cap ($)
             </label>
-            <input
+            <input aria-label="Min Market Cap ($)"
               type="number"
               placeholder="e.g. 10000000000 for $10B"
               value={minMarketCap}
               onChange={(e) => setMinMarketCap(e.target.value)}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
             />
           </div>
         </div>
@@ -493,8 +415,8 @@ export default function Screener() {
       <Panel className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-neutral-800 p-4">
           <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-brand-400" />
-            <h2 className="text-base font-medium text-white">Screening Results</h2>
+            <Building2 className="h-5 w-5 text-accent" />
+            <h2 className="text-base font-medium text-ink">Screening Results</h2>
             <Badge tone="neutral" className="ml-2">
               {sortedResults.length} matches
             </Badge>
@@ -502,20 +424,20 @@ export default function Screener() {
         </div>
 
         {sortedResults.length === 0 ? (
-          <div className="p-12 text-center text-neutral-400">
-            <SlidersHorizontal className="mx-auto mb-3 h-8 w-8 text-neutral-600" />
+          <div className="p-12 text-center text-muted">
+            <SlidersHorizontal className="mx-auto mb-3 h-8 w-8 text-muted" />
             <p className="text-sm">No instruments matched the specified criteria.</p>
-            <p className="text-xs text-neutral-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Try relaxing filter bounds or clicking a preset above.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-neutral-300">
-              <thead className="border-b border-neutral-800 bg-neutral-900/60 text-xs uppercase tracking-wider text-neutral-400">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-neutral-800 bg-elevated/60 text-xs uppercase tracking-wider text-muted">
                 <tr>
                   <th
-                    className="cursor-pointer px-4 py-3 hover:text-white"
+                    className="cursor-pointer px-4 py-3 hover:text-ink"
                     onClick={() => toggleSort("ticker")}
                   >
                     <div className="flex items-center gap-1">
@@ -523,7 +445,7 @@ export default function Screener() {
                     </div>
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 hover:text-white"
+                    className="cursor-pointer px-4 py-3 hover:text-ink"
                     onClick={() => toggleSort("name")}
                   >
                     <div className="flex items-center gap-1">
@@ -533,15 +455,15 @@ export default function Screener() {
                   <th className="px-4 py-3">Exchange</th>
                   <th className="px-4 py-3">Sector</th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right hover:text-white"
-                    onClick={() => toggleSort("latest_price")}
+                    className="cursor-pointer px-4 py-3 text-right hover:text-ink"
+                    onClick={() => toggleSort("price")}
                   >
                     <div className="flex items-center justify-end gap-1">
                       Price <ArrowUpDown className="h-3 w-3" />
                     </div>
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-right hover:text-ink"
                     onClick={() => toggleSort("pe_ratio")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -549,7 +471,7 @@ export default function Screener() {
                     </div>
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-right hover:text-ink"
                     onClick={() => toggleSort("roe")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -557,7 +479,7 @@ export default function Screener() {
                     </div>
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-right hover:text-ink"
                     onClick={() => toggleSort("market_cap")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -568,30 +490,30 @@ export default function Screener() {
               </thead>
               <tbody className="divide-y divide-neutral-800">
                 {sortedResults.map((item) => (
-                  <tr key={item.id} className="transition hover:bg-neutral-800/40">
-                    <td className="px-4 py-3 font-semibold text-white">
+                  <tr key={item.id} className="transition hover:bg-elevated/40">
+                    <td className="px-4 py-3 font-semibold text-ink">
                       <Link
                         to={`/companies/${item.ticker}`}
-                        className="text-brand-400 hover:underline"
+                        className="text-accent hover:underline"
                       >
                         {item.ticker}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-neutral-200">{item.name}</td>
-                    <td className="px-4 py-3 text-xs text-neutral-400">{item.exchange}</td>
-                    <td className="px-4 py-3 text-xs text-neutral-400">{item.sector}</td>
-                    <td className="px-4 py-3 text-right font-mono text-neutral-100">
-                      {item.latest_price !== null
-                        ? `${item.currency} ${item.latest_price.toFixed(2)}`
+                    <td className="px-4 py-3 text-ink">{item.name}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{item.exchange}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{item.sector}</td>
+                    <td className="px-4 py-3 text-right font-mono text-ink">
+                      {item.price !== null
+                        ? `${item.currency} ${item.price.toFixed(2)}`
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-neutral-100">
+                    <td className="px-4 py-3 text-right font-mono text-ink">
                       {item.pe_ratio !== null ? item.pe_ratio.toFixed(1) + "x" : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-neutral-100">
+                    <td className="px-4 py-3 text-right font-mono text-ink">
                       {item.roe !== null ? formatPercent(item.roe) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-neutral-100">
+                    <td className="px-4 py-3 text-right font-mono text-ink">
                       {item.market_cap !== null ? formatNumber(item.market_cap) : "—"}
                     </td>
                   </tr>
@@ -605,40 +527,40 @@ export default function Screener() {
       {/* Save Modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-elevated p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Save Current Screen</h3>
+              <h3 className="text-lg font-semibold text-ink">Save Current Screen</h3>
               <button
                 onClick={() => setSaveModalOpen(false)}
-                className="text-neutral-400 hover:text-white"
+                className="text-muted hover:text-ink"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Preset Name
                 </label>
-                <input
+                <input aria-label="Preset Name"
                   type="text"
                   placeholder="e.g. My High Quality Tech Screen"
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
-                  className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                   data-testid="save-screen-name-input"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Description (Optional)
                 </label>
-                <textarea
+                <textarea aria-label="Description (Optional)"
                   rows={2}
                   placeholder="Notes on parameters..."
                   value={saveDesc}
                   onChange={(e) => setSaveDesc(e.target.value)}
-                  className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-md border border-neutral-700 bg-elevated px-3 py-2 text-sm text-ink focus:border-brand-500 focus:outline-none"
                 />
               </div>
             </div>

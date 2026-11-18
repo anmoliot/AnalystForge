@@ -105,8 +105,20 @@ async def test_valuation_sotp_api(client: httpx.AsyncClient) -> None:
     payload = {
         "ticker": "AMZN",
         "segments": [
-            {"name": "Retail", "metric_name": "Revenue", "metric_value": 4000.0, "multiple": 2.0, "ownership_pct": 1.0},
-            {"name": "AWS Cloud", "metric_name": "EBITDA", "metric_value": 1000.0, "multiple": 18.0, "ownership_pct": 1.0},
+            {
+                "name": "Retail",
+                "metric_name": "Revenue",
+                "metric_value": 4000.0,
+                "multiple": 2.0,
+                "ownership_pct": 1.0,
+            },
+            {
+                "name": "AWS Cloud",
+                "metric_name": "EBITDA",
+                "metric_value": 1000.0,
+                "multiple": 18.0,
+                "ownership_pct": 1.0,
+            },
         ],
         "shares_outstanding": 100.0,
         "net_debt": 2000.0,
@@ -126,8 +138,18 @@ async def test_valuation_precedents_api(client: httpx.AsyncClient) -> None:
     payload = {
         "ticker": "CRWD",
         "deals": [
-            {"target": "CyberOne", "announced_date": "2024-01-01", "deal_value": 1000.0, "target_metric": 100.0},
-            {"target": "SecurityPro", "announced_date": "2024-06-01", "deal_value": 2400.0, "target_metric": 200.0},
+            {
+                "target": "CyberOne",
+                "announced_date": "2024-01-01",
+                "deal_value": 1000.0,
+                "target_metric": 100.0,
+            },
+            {
+                "target": "SecurityPro",
+                "announced_date": "2024-06-01",
+                "deal_value": 2400.0,
+                "target_metric": 200.0,
+            },
         ],
         "target_metric": 150.0,
         "shares_outstanding": 50.0,
@@ -172,9 +194,30 @@ async def test_valuation_football_field_api(client: httpx.AsyncClient) -> None:
         "ticker": "NVDA",
         "current_share_price": 140.0,
         "ranges": [
-            {"method_id": "dcf_fcff", "label": "DCF (FCFF)", "category": "Intrinsic", "low": 130.0, "base": 150.0, "high": 170.0},
-            {"method_id": "comps_pe", "label": "Comps P/E", "category": "Comps", "low": 120.0, "base": 145.0, "high": 165.0},
-            {"method_id": "ddm", "label": "DDM", "category": "Intrinsic", "low": 110.0, "base": 135.0, "high": 155.0},
+            {
+                "method_id": "dcf_fcff",
+                "label": "DCF (FCFF)",
+                "category": "Intrinsic",
+                "low": 130.0,
+                "base": 150.0,
+                "high": 170.0,
+            },
+            {
+                "method_id": "comps_pe",
+                "label": "Comps P/E",
+                "category": "Comps",
+                "low": 120.0,
+                "base": 145.0,
+                "high": 165.0,
+            },
+            {
+                "method_id": "ddm",
+                "label": "DDM",
+                "category": "Intrinsic",
+                "low": 110.0,
+                "base": 135.0,
+                "high": 155.0,
+            },
         ],
     }
     resp = await client.post("/api/v1/valuation/football-field", json=payload)

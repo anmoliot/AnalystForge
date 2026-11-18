@@ -8,6 +8,7 @@ and worker store in ``job_runs``.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -827,21 +828,23 @@ async def ingest_news(
                 topics = classify_topics(full_text)
                 tagged_inst_ids = tag_instruments_in_text(full_text, instruments)
 
-                rows.append({
-                    "url": article.url,
-                    "source": article.source,
-                    "title": article.title,
-                    "summary": article.summary,
-                    "content": extracted_content,
-                    "language": article.language,
-                    "published_at": article.published_at,
-                    "fetched_at": now,
-                    "sentiment_score": sentiment["score"],
-                    "sentiment_label": sentiment["label"],
-                    "sentiment_confidence": sentiment["confidence"],
-                    "sentiment_backend": sentiment["backend"],
-                    "topics": topics,
-                })
+                rows.append(
+                    {
+                        "url": article.url,
+                        "source": article.source,
+                        "title": article.title,
+                        "summary": article.summary,
+                        "content": extracted_content,
+                        "language": article.language,
+                        "published_at": article.published_at,
+                        "fetched_at": now,
+                        "sentiment_score": sentiment["score"],
+                        "sentiment_label": sentiment["label"],
+                        "sentiment_confidence": sentiment["confidence"],
+                        "sentiment_backend": sentiment["backend"],
+                        "topics": topics,
+                    }
+                )
                 article_tag_mappings.append((article.url, tagged_inst_ids))
 
             summary.add(
@@ -851,10 +854,14 @@ async def ingest_news(
 
             # Link tagged instruments in news_article_instruments
             all_db_articles = (
-                await session.execute(
-                    select(NewsArticle).where(NewsArticle.url.in_([r["url"] for r in rows]))
+                (
+                    await session.execute(
+                        select(NewsArticle).where(NewsArticle.url.in_([r["url"] for r in rows]))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             db_art_by_url = {a.url: a.id for a in all_db_articles}
 
             tag_rows = []

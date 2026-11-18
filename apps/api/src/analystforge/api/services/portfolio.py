@@ -15,7 +15,7 @@ from bisect import bisect_left
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Any
@@ -31,7 +31,6 @@ from analystforge.api.models.market import Instrument, PriceBar
 from analystforge.api.models.portfolio import PortfolioTransaction
 from analystforge.quant.attribution import (
     AttributionGroup,
-    AttributionMethod,
     AttributionResult,
     brinson_attribution,
 )
@@ -46,7 +45,6 @@ from analystforge.quant.optimization import (
     min_variance,
     risk_parity,
 )
-from analystforge.quant.rebalance import generate_rebalance_trades
 from analystforge.quant.returns import cagr, twr, xirr
 from analystforge.quant.risk import (
     alpha,
@@ -313,7 +311,11 @@ def _ordered(transactions: Iterable[PortfolioTransaction]) -> list[PortfolioTran
         transactions,
         key=lambda tx: (
             tx.trade_date,
-            tx.created_at or datetime.min,
+            (
+                tx.created_at.replace(tzinfo=UTC)
+                if tx.created_at
+                else datetime.min.replace(tzinfo=UTC)
+            ),
             str(tx.id),
         ),
     )
@@ -473,7 +475,7 @@ def build_ledger(
     *,
     cost_basis_method: str = "FIFO",
 ) -> LedgerResult:
-    """Replay transactions into open lots, realized P&L, income, and cash.
+    """Replay transactions into open lots, realized p&L, income, and cash.
 
     Conventions (documented in ``docs/DECISIONS.md``):
 
@@ -588,10 +590,7 @@ async def load_price_histories(
             missing.append(ticker)
             continue
         index = pd.DatetimeIndex([row[0] for row in rows]).normalize()
-        values = [
-            float(row[2] if row[2] is not None else row[1])
-            for row in rows
-        ]
+        values = [float(row[2] if row[2] is not None else row[1]) for row in rows]
         series = pd.Series(values, index=index, name=ticker, dtype=float)
         series = series[~series.index.duplicated(keep="last")].sort_index()
         histories[ticker] = PriceHistory(
@@ -644,7 +643,7 @@ async def enrich_holdings_with_prices(
     *,
     base_currency: str = "USD",
 ) -> list[HoldingItem]:
-    """Attach latest market prices, market values, P&L, and weights."""
+    """Attach latest market prices, market values, p&L, and weights."""
     if not holdings:
         return []
     prices = await latest_prices(session, [h.ticker for h in holdings], base_currency=base_currency)
@@ -730,9 +729,7 @@ def build_daily_nav(
     first_tx = ordered[0].trade_date
     calendar = sorted(day for day in calendar_points if day.date() >= first_tx)
     if not calendar:
-        raise DataUnavailableError(
-            "Transaction dates do not overlap the available price history."
-        )
+        raise DataUnavailableError("Transaction dates do not overlap the available price history.")
 
     state = _LedgerState(method=_cost_basis_method(cost_basis_method))
     index = 0
@@ -907,7 +904,9 @@ def compute_risk_metrics(
                     "information_ratio": _round(
                         information_ratio(aligned_portfolio, benchmark_returns), 6
                     ),
-                    "upside_capture": _round(upside_capture(aligned_portfolio, benchmark_returns), 6),
+                    "upside_capture": _round(
+                        upside_capture(aligned_portfolio, benchmark_returns), 6
+                    ),
                     "downside_capture": _round(
                         downside_capture(aligned_portfolio, benchmark_returns), 6
                     ),
@@ -1112,7 +1111,9 @@ def optimize_weights(
         "solver": result.solver,
         "status": result.status,
         "observations": len(returns_df),
-        "as_of": str(returns_df.index[-1].date()) if hasattr(returns_df.index[-1], "date") else date.today().isoformat(),
+        "as_of": str(returns_df.index[-1].date())
+        if hasattr(returns_df.index[-1], "date")
+        else datetime.now(UTC).date().isoformat(),
         "risk_contributions": {
             ticker: round(float(contribution), 8)
             for ticker, contribution in zip(tickers, contributions, strict=True)
@@ -1252,7 +1253,9 @@ def execute_stress_tests(
             index=pd.DatetimeIndex([pd.Timestamp(snapshot.as_of) for snapshot in nav_snapshots]),
             dtype=float,
         )
-        portfolio_returns = nav_prices.pct_change().dropna().reindex(benchmark_returns.index).dropna()
+        portfolio_returns = (
+            nav_prices.pct_change().dropna().reindex(benchmark_returns.index).dropna()
+        )
         benchmark_returns = benchmark_returns.loc[portfolio_returns.index]
         if len(portfolio_returns) < MIN_BETA_OBSERVATIONS:
             raise DataUnavailableError("Not enough overlapping observations to estimate beta.")
@@ -1355,9 +1358,9 @@ def compute_sector_attribution(
     for sector, rows in portfolio_by_sector.items():
         sector_value = sum((value for value, _ in rows), ZERO)
         portfolio_weights[sector] = sector_value / total_value
-        portfolio_returns[sector] = sum(
-            (to_decimal(ret) * value for value, ret in rows), ZERO
-        ) / sector_value
+        portfolio_returns[sector] = (
+            sum((to_decimal(ret) * value for value, ret in rows), ZERO) / sector_value
+        )
 
     benchmark_by_name = {str(row["name"]): row for row in benchmark_groups}
     names = sorted(set(portfolio_by_sector) | set(benchmark_by_name))
@@ -1444,7 +1447,9 @@ def _canonical_columns(
             if alias in normalized:
                 resolved[canonical] = normalized[alias]
                 break
-    return resolved, [name for name in ("date", "ticker", "type", "quantity", "price") if name not in resolved]
+    return resolved, [
+        name for name in ("date", "ticker", "type", "quantity", "price") if name not in resolved
+    ]
 
 
 def parse_csv_transactions(
@@ -1498,9 +1503,7 @@ def parse_csv_transactions(
                 raise ValueError("quantity must be positive")
             if transaction_type != "SPLIT" and price < ZERO:
                 raise ValueError("price cannot be negative")
-            currency = (
-                (row.get(columns.get("currency", "")) or default_currency).strip().upper()
-            )
+            currency = (row.get(columns.get("currency", "")) or default_currency).strip().upper()
             commission_raw = (row.get(columns.get("commission", "")) or "0").strip()
             try:
                 commission = Decimal(commission_raw or "0")
@@ -1532,12 +1535,18 @@ def parse_csv_transactions(
                     notes or "",
                 ]
             )
-            external_id = external_id or "sha256:" + hashlib.sha256(fingerprint.encode()).hexdigest()
+            external_id = (
+                external_id or "sha256:" + hashlib.sha256(fingerprint.encode()).hexdigest()
+            )
             if len(external_id) > 128:
                 raise ValueError("external_id must be at most 128 characters")
             if external_id in seen_ids:
                 errors.append(
-                    {"row": row_index, "error": f"duplicate external_id {external_id!r}", "data": row}
+                    {
+                        "row": row_index,
+                        "error": f"duplicate external_id {external_id!r}",
+                        "data": row,
+                    }
                 )
                 continue
             seen_ids.add(external_id)
@@ -1561,9 +1570,7 @@ def parse_csv_transactions(
     return records, errors
 
 
-def preview_transactions_file(
-    content_bytes: bytes, filename: str
-) -> dict[str, Any]:
+def preview_transactions_file(content_bytes: bytes, filename: str) -> dict[str, Any]:
     """Preview uploaded transactions file and suggest column mappings."""
     if filename.lower().endswith((".xlsx", ".xls")):
         df = pd.read_excel(io.BytesIO(content_bytes), nrows=10)
@@ -1579,7 +1586,7 @@ def preview_transactions_file(
         content_str = content_bytes.decode("utf-8", errors="replace")
         reader = csv.DictReader(io.StringIO(content_str))
         headers = list(reader.fieldnames or [])
-        rows = [row for _, row in zip(range(5), reader)]
+        rows = [row for _, row in zip(range(5), reader, strict=False)]
 
     mapping, missing = _canonical_columns(headers, None)
     return {
@@ -1632,7 +1639,9 @@ def compute_fama_french_exposure(
 ) -> dict[str, Any]:
     """Compute Fama-French multi-factor exposure regression."""
     if len(portfolio_returns) < 5:
-        raise DataUnavailableError("Insufficient returns history for factor regression; need at least 5 periods.")
+        raise DataUnavailableError(
+            "Insufficient returns history for factor regression; need at least 5 periods."
+        )
 
     # If factors_df is not supplied, use the benchmark as Mkt-RF and neutral
     # zero proxies for SMB/HML.  Zeros are a deterministic modeling assumption
@@ -1681,8 +1690,12 @@ def compute_rolling_statistics(
     r_vol = rolling_volatility(portfolio_returns, window=window, periods=periods).dropna()
     r_sr = rolling_sharpe(portfolio_returns, window=window, periods=periods).dropna()
     r_b = rolling_beta(portfolio_returns, benchmark_returns, window=window).dropna()
-    r_te = rolling_tracking_error(portfolio_returns, benchmark_returns, window=window, periods=periods).dropna()
-    r_ir = rolling_information_ratio(portfolio_returns, benchmark_returns, window=window, periods=periods).dropna()
+    r_te = rolling_tracking_error(
+        portfolio_returns, benchmark_returns, window=window, periods=periods
+    ).dropna()
+    r_ir = rolling_information_ratio(
+        portfolio_returns, benchmark_returns, window=window, periods=periods
+    ).dropna()
 
     prices = pd.Series((1.0 + portfolio_returns).cumprod() * 100.0, index=portfolio_returns.index)
     r_mdd = rolling_max_drawdown(prices, window=window).dropna()
@@ -1712,7 +1725,7 @@ def compute_black_litterman_portfolio(
     """Compute Black-Litterman asset allocation given return matrix and optional views."""
     tickers = list(returns_df.columns)
     n = len(tickers)
-    means, cov = mean_covariance(returns_df)
+    _means, cov = mean_covariance(returns_df)
 
     if market_weights is None:
         w_mkt = [1.0 / n] * n
@@ -1721,23 +1734,23 @@ def compute_black_litterman_portfolio(
         tot = sum(w_mkt) or 1.0
         w_mkt = [w / tot for w in w_mkt]
 
-    P: list[list[float]] | None = None
-    Q: list[float] | None = None
+    p: list[list[float]] | None = None
+    q: list[float] | None = None
     if views:
-        P_list = []
-        Q_list = []
+        p_list = []
+        q_list = []
         for v in views:
             row = [float(v.get("assets", {}).get(t, 0.0)) for t in tickers]
-            P_list.append(row)
-            Q_list.append(float(v.get("expected_return", 0.0)))
-        P = P_list
-        Q = Q_list
+            p_list.append(row)
+            q_list.append(float(v.get("expected_return", 0.0)))
+        p = p_list
+        q = q_list
 
     res = black_litterman(
         cov,
         w_mkt,
-        views_matrix=P,
-        views_returns=Q,
+        views_matrix=p,
+        views_returns=q,
         risk_aversion=risk_aversion,
         tau=tau,
         risk_free_rate=risk_free_rate,
@@ -1745,10 +1758,17 @@ def compute_black_litterman_portfolio(
 
     return {
         "tickers": tickers,
-        "equilibrium_returns": {t: round(float(r), 6) for t, r in zip(tickers, res.implied_returns, strict=True)},
-        "posterior_returns": {t: round(float(r), 6) for t, r in zip(tickers, res.posterior_returns, strict=True)},
-        "optimal_weights": {t: round(float(w), 6) for t, r, w in zip(tickers, res.implied_returns, res.optimal_weights, strict=True)},
+        "equilibrium_returns": {
+            t: round(float(r), 6) for t, r in zip(tickers, res.implied_returns, strict=True)
+        },
+        "posterior_returns": {
+            t: round(float(r), 6) for t, r in zip(tickers, res.posterior_returns, strict=True)
+        },
+        "optimal_weights": {
+            t: round(float(w), 6)
+            for t, r, w in zip(tickers, res.implied_returns, res.optimal_weights, strict=True)
+        },
         "risk_aversion": res.risk_aversion,
         "tau": res.tau,
-        "formula": "Pi = delta * Sigma * w_mkt; E[R] = [(tau*Sigma)^-1 + P'*Omega^-1*P]^-1 * [(tau*Sigma)^-1*Pi + P'*Omega^-1*Q]",
+        "formula": "Pi = delta * Sigma * w_mkt; E[R] = [(tau*Sigma)^-1 + p'*Omega^-1*p]^-1 * [(tau*Sigma)^-1*Pi + p'*Omega^-1*q]",
     }

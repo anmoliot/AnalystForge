@@ -8,11 +8,11 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     Numeric,
     String,
     Text,
@@ -63,7 +63,9 @@ class AlertRule(Base, TimestampMixin):
     )  # ["in_app", "email", "webhook"]
     email_recipient: Mapped[str | None] = mapped_column(String(255), nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     events: Mapped[list[AlertEvent]] = relationship(
         "AlertEvent", back_populates="rule", cascade="all, delete-orphan"
@@ -98,8 +100,12 @@ class AlertDelivery(Base, TimestampMixin):
         ForeignKey("alert_events.id", ondelete="CASCADE"), nullable=False, index=True
     )
     channel: Mapped[str] = mapped_column(String(32), nullable=False)  # in_app, email, webhook
-    status: Mapped[str] = mapped_column(String(32), default="delivered", nullable=False)  # delivered, failed, retrying
-    recipient: Mapped[str | None] = mapped_column(String(512), nullable=True)  # email address or webhook URL
+    status: Mapped[str] = mapped_column(
+        String(32), default="delivered", nullable=False
+    )  # delivered, failed, retrying
+    recipient: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )  # email address or webhook URL
     attempts: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

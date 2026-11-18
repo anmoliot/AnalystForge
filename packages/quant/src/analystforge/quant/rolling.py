@@ -12,17 +12,9 @@ Calculates moving-window metrics over a time series of returns or prices:
 from __future__ import annotations
 
 import math
+
 import numpy as np
 import pandas as pd
-
-from analystforge.quant.risk import (
-    beta as calc_beta,
-    information_ratio as calc_information_ratio,
-    max_drawdown as calc_max_drawdown,
-    sharpe as calc_sharpe,
-    tracking_error as calc_tracking_error,
-    volatility as calc_volatility,
-)
 
 
 def rolling_volatility(

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+
 import pytest
 import respx
-import httpx
 
 from analystforge.providers.errors import ProviderNotConfiguredError
 from analystforge.providers.llm import (
@@ -15,7 +15,6 @@ from analystforge.providers.llm import (
     NoneLLMProvider,
     OpenAICompatibleProvider,
     TokenBucket,
-    ToolCall,
 )
 
 
@@ -229,11 +228,13 @@ def test_context_trimming_preserves_system_prompt() -> None:
     long_passage = "A" * 600
     user_query = {"role": "user", "content": "What is the valuation?"}
 
-    trimmed = provider._trim_messages([
-        system_msg,
-        {"role": "user", "content": long_passage},
-        user_query,
-    ])
+    trimmed = provider._trim_messages(
+        [
+            system_msg,
+            {"role": "user", "content": long_passage},
+            user_query,
+        ]
+    )
 
     # System message must be preserved
     assert trimmed[0]["role"] == "system"

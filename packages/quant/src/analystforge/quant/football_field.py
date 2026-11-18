@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
-from analystforge.quant.money import ZERO, quantize, to_decimal
+from analystforge.quant.money import quantize, to_decimal
 
 
 def _finite(value: Decimal, name: str) -> Decimal:
@@ -32,7 +31,9 @@ class ValuationRange:
         if self.low > self.high:
             raise ValueError(f"low ({self.low}) cannot exceed high ({self.high}) for {self.label}")
         if not (self.low <= self.base <= self.high):
-            raise ValueError(f"base ({self.base}) must be between low ({self.low}) and high ({self.high}) for {self.label}")
+            raise ValueError(
+                f"base ({self.base}) must be between low ({self.low}) and high ({self.high}) for {self.label}"
+            )
 
 
 @dataclass(frozen=True, slots=True)

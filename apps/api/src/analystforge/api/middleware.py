@@ -21,6 +21,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
 
@@ -64,7 +65,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             logger.info(
                 "request.completed",
                 method=request.method,
-                path=request.url.path,
                 route=route,
                 status=status_code,
                 duration_ms=round(elapsed * 1000, 2),
@@ -82,4 +82,6 @@ class ResponseHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Request-ID"] = request_id
         for key, value in SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response

@@ -72,7 +72,6 @@ export function AppShell() {
         <button
           type="button"
           className="flex w-full items-center gap-2 rounded border border-line bg-elevated px-2 py-1.5 text-left hover:border-muted/40"
-          aria-label="Switch workspace"
         >
           <span className="flex size-5 items-center justify-center rounded-sm bg-accent/20 font-mono text-2xs font-semibold text-accent">
             AF
@@ -87,7 +86,7 @@ export function AppShell() {
       <nav aria-label="Primary" className="flex-1 overflow-y-auto px-2 py-3">
         {navSections.map((section) => (
           <div key={section.title} className="mb-4 last:mb-0">
-            <p className="mb-1 px-2 text-2xs font-semibold uppercase tracking-[0.1em] text-muted/70">
+            <p className="mb-1 px-2 text-2xs font-semibold uppercase tracking-[0.1em] text-muted">
               {section.title}
             </p>
             <ul className="space-y-0.5">
@@ -110,7 +109,7 @@ export function AppShell() {
                       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.shortcut ? (
-                        <span className="hidden font-mono text-2xs text-muted/50 group-hover:block">
+                        <span className="hidden font-mono text-2xs text-muted group-hover:block">
                           {item.shortcut}
                         </span>
                       ) : null}
@@ -181,7 +180,7 @@ export function AppShell() {
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
+                <span className="truncate text-sm font-semibold tracking-tight">{title}</span>
                 {meta.data ? (
                   <Badge tone={meta.data.environment === "production" ? "accent" : "neutral"}>
                     {meta.data.environment}

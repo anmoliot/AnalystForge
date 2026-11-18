@@ -220,7 +220,9 @@ async def test_search_companies(client: httpx.AsyncClient, sample_instrument: In
 
 
 @pytest.mark.asyncio
-async def test_get_company_overview(client: httpx.AsyncClient, sample_instrument: Instrument) -> None:
+async def test_get_company_overview(
+    client: httpx.AsyncClient, sample_instrument: Instrument
+) -> None:
     resp = await client.get("/api/v1/companies/AAPL")
     assert resp.status_code == 200
     data = resp.json()
@@ -250,7 +252,9 @@ async def test_get_company_prices(client: httpx.AsyncClient, sample_instrument: 
 
 
 @pytest.mark.asyncio
-async def test_get_company_statements(client: httpx.AsyncClient, sample_instrument: Instrument) -> None:
+async def test_get_company_statements(
+    client: httpx.AsyncClient, sample_instrument: Instrument
+) -> None:
     resp = await client.get("/api/v1/companies/AAPL/statements")
     assert resp.status_code == 200
     stmts = resp.json()
@@ -284,7 +288,9 @@ async def test_get_company_peers(client: httpx.AsyncClient, sample_instrument: I
 
 
 @pytest.mark.asyncio
-async def test_get_company_filings(client: httpx.AsyncClient, sample_instrument: Instrument) -> None:
+async def test_get_company_filings(
+    client: httpx.AsyncClient, sample_instrument: Instrument
+) -> None:
     resp = await client.get("/api/v1/companies/AAPL/filings")
     assert resp.status_code == 200
     filings = resp.json()

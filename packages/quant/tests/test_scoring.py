@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from decimal import Decimal
 
 import pytest
+from quant_fixtures import D, fact_for
 
 from analystforge.quant.scoring import (
     AltmanVariant,
@@ -19,8 +19,6 @@ from analystforge.quant.statements import (
     StatementType,
     normalize_statement,
 )
-
-from quant_fixtures import D, fact_for
 
 FY = FiscalPeriod.FY.value
 
@@ -235,7 +233,7 @@ def test_altman_public_requires_market_equity(reference) -> None:
 
 
 def test_altman_distress_zone() -> None:
-    current, prior = _weak_company()
+    current, _prior = _weak_company()
     result = altman_z_score(current, None, AltmanVariant.PRIVATE)
     assert result.zone is ScoreZone.DISTRESS
 

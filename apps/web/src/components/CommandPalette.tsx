@@ -168,7 +168,7 @@ export function CommandPalette() {
             aria-label="Search commands"
             aria-controls="command-results"
             aria-activedescendant={filtered[activeIndex]?.id}
-            className="h-full flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted/70"
+            className="h-full flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
           />
           <span className="kbd">ESC</span>
         </div>

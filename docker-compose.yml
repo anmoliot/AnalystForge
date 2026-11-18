@@ -1,7 +1,7 @@
 name: analystforge
 
 x-app-env: &app-env
-  APP_ENV: ${APP_ENV:-development}
+  ENVIRONMENT: ${ENVIRONMENT:-development}
   DEBUG: ${DEBUG:-false}
   SECRET_KEY: ${SECRET_KEY:?Run 'make env' to generate SECRET_KEY}
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}

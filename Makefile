@@ -57,7 +57,7 @@ test-web: ## Run frontend tests
 	cd apps/web && npm test -- --run
 
 e2e: ## Run Playwright end-to-end tests (stack must be up)
-	cd apps/web && npx playwright test
+	cd apps/web && npm run test:e2e
 
 lint: lint-python lint-web ## Lint everything
 
@@ -79,7 +79,7 @@ format: ## Auto-format Python and web code
 	cd apps/web && npm run format
 
 coverage: ## Python coverage report (quant gate: 95%)
-	$(UV) run pytest --cov=analystforge.quant --cov-report=term-missing --cov-report=html
+	$(UV) run pytest --cov=analystforge.quant --cov-branch --cov-fail-under=95 --cov-report=term-missing --cov-report=html
 
 dev-api: ## Run the API natively with reload
 	$(UV) run uvicorn analystforge.api.main:app --reload --host 127.0.0.1 --port 8000
@@ -121,3 +121,13 @@ clean: ## Remove local caches and build artefacts (not volumes)
 	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov coverage.xml
 	rm -rf apps/web/dist apps/web/playwright-report apps/web/test-results
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+
+.PHONY: load-smoke load-test load-stress
+load-smoke: ## Exercise the isolated test API with one k6 user
+	k6 run tests/load/smoke.js
+
+load-test: ## Run the steady load profile
+	k6 run tests/load/load.js
+
+load-stress: ## Ramp up k6 users against the test API
+	k6 run tests/load/stress.js

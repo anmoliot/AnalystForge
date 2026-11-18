@@ -9,15 +9,14 @@ Supports:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+import smtplib
+from datetime import UTC, datetime
 from decimal import Decimal
 from email.message import EmailMessage
-import smtplib
 from typing import Any
 
 import httpx
-from sqlalchemy import desc, func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import desc, select
 
 from analystforge.api.config import Settings
 from analystforge.api.db import Database
@@ -95,14 +94,17 @@ async def send_alert_email(
 async def send_alert_webhook(
     webhook_url: str,
     payload: dict[str, Any],
-    timeout: float = 5.0,
+    timeout: float = 5.0,  # noqa: ASYNC109 - existing timeout interface
 ) -> None:
     """Deliver an alert payload to a remote webhook URL."""
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(
             webhook_url,
             json=payload,
-            headers={"User-Agent": "AnalystForge-Alerts/1.0", "X-AnalystForge-Event": "alert.triggered"},
+            headers={
+                "User-Agent": "AnalystForge-Alerts/1.0",
+                "X-AnalystForge-Event": "alert.triggered",
+            },
         )
         resp.raise_for_status()
 
@@ -154,7 +156,7 @@ async def evaluate_alert_rules(
 
             if is_triggered:
                 summary["alerts_triggered"] += 1
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 rule.last_triggered_at = now
 
                 event = AlertEvent(
@@ -207,7 +209,7 @@ async def evaluate_alert_rules(
 
                         if email_success:
                             delivery.status = "delivered"
-                            delivery.delivered_at = datetime.now(timezone.utc)
+                            delivery.delivered_at = datetime.now(UTC)
                             summary["deliveries_succeeded"] += 1
                         else:
                             delivery.status = "failed"
@@ -240,7 +242,7 @@ async def evaluate_alert_rules(
 
                         if wh_success:
                             delivery.status = "delivered"
-                            delivery.delivered_at = datetime.now(timezone.utc)
+                            delivery.delivered_at = datetime.now(UTC)
                             summary["deliveries_succeeded"] += 1
                         else:
                             delivery.status = "failed"
@@ -268,7 +270,7 @@ async def run_scheduled_screens_and_dispatch(
         summary["screens_evaluated"] = len(scheduled_screens)
 
         for screen in scheduled_screens:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             screen.last_run_at = now
 
             if screen.notify_email:
@@ -291,7 +293,9 @@ async def run_scheduled_screens_and_dispatch(
                     )
                     summary["screens_notified"] += 1
                 except Exception as exc:
-                    logger.warning("screener.email_failed", screen_id=str(screen.id), error=str(exc))
+                    logger.warning(
+                        "screener.email_failed", screen_id=str(screen.id), error=str(exc)
+                    )
 
         await session.commit()
 

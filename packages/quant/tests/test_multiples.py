@@ -55,7 +55,9 @@ def _with_income(statements: FinancialStatements, **changes: Decimal) -> Financi
 
 
 def test_reference_company_multiples(reference) -> None:
-    multiples = compute_multiples(MultipleInputs.from_statements(reference.current, reference.market))
+    multiples = compute_multiples(
+        MultipleInputs.from_statements(reference.current, reference.market)
+    )
 
     assert multiples["market_cap"].value == D("1800000")
     assert multiples["enterprise_value"].value == D("2000000")
@@ -67,14 +69,14 @@ def test_reference_company_multiples(reference) -> None:
     assert multiples["ev_to_ebit"].value == pytest.approx(D("10"))
     assert multiples["ev_to_sales"].value == pytest.approx(D("2"))
     assert multiples["ev_to_free_cash_flow"].value == pytest.approx(D("2000000") / D("110000"))
-    assert multiples["price_to_free_cash_flow"].value == pytest.approx(
-        D("1800000") / D("110000")
-    )
+    assert multiples["price_to_free_cash_flow"].value == pytest.approx(D("1800000") / D("110000"))
     assert multiples["free_cash_flow_yield"].value == pytest.approx(D("110000") / D("1800000"))
 
 
 def test_multiples_are_traceable(reference) -> None:
-    multiples = compute_multiples(MultipleInputs.from_statements(reference.current, reference.market))
+    multiples = compute_multiples(
+        MultipleInputs.from_statements(reference.current, reference.market)
+    )
 
     assert set(multiples) == EXPECTED_KEYS
     for key, result in multiples.items():
@@ -91,7 +93,9 @@ def test_loss_making_and_negative_book_companies_get_notes(reference) -> None:
     loss = _with_income(reference.current, **{LineItem.NET_INCOME: D("-5")})
     loss_multiples = compute_multiples(MultipleInputs.from_statements(loss, reference.market))
     assert loss_multiples["price_to_earnings"].value is None
-    assert loss_multiples["price_to_earnings"].note == "Not meaningful for nil or negative earnings."
+    assert (
+        loss_multiples["price_to_earnings"].note == "Not meaningful for nil or negative earnings."
+    )
     assert loss_multiples["earnings_yield"].value == pytest.approx(D("-5") / D("1800000"))
 
     no_fcf = FinancialStatements(
@@ -119,9 +123,7 @@ def test_negative_book_equity_is_not_meaningful(reference) -> None:
         balance=replace(reference.current.balance, values=values),
         cashflow=reference.current.cashflow,
     )
-    multiples = compute_multiples(
-        MultipleInputs.from_statements(negative_book, reference.market)
-    )
+    multiples = compute_multiples(MultipleInputs.from_statements(negative_book, reference.market))
 
     assert multiples["price_to_book"].value is None
     assert multiples["price_to_book"].note == "Not meaningful for negative book equity."

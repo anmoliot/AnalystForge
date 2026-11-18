@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, update
 
 from analystforge.api.db import Database
 from analystforge.api.logging import get_logger

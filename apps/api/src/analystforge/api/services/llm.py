@@ -2,22 +2,14 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-from typing import Any
-
 import structlog
 
 from analystforge.api.config import Settings, get_settings
 from analystforge.providers.llm import (
     AnthropicProvider,
-    ChatMessage,
-    DeterministicFakeLLMProvider,
     LLMProvider,
-    LLMRateLimitError,
-    LLMResponse,
     NoneLLMProvider,
     OpenAICompatibleProvider,
-    ToolCall,
 )
 
 logger = structlog.get_logger("api.llm")
@@ -27,7 +19,11 @@ _LLM_PROVIDER_INSTANCE: LLMProvider | None = None
 
 def create_llm_provider(settings: Settings) -> LLMProvider:
     provider_type = settings.llm_provider.lower()
-    api_key = settings.provider_key(settings.llm_provider) or settings.provider_key("openai-compatible") or settings.provider_key("groq")
+    api_key = (
+        settings.provider_key(settings.llm_provider)
+        or settings.provider_key("openai-compatible")
+        or settings.provider_key("groq")
+    )
 
     if provider_type == "none" or not api_key:
         return NoneLLMProvider()

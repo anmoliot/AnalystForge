@@ -9,11 +9,11 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Any, Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, skew, kurtosis
+from scipy.stats import norm
 
 
 class LookAheadBiasError(ValueError):
@@ -45,7 +45,9 @@ def probabilistic_sharpe_ratio(
         return 0.5
 
     # Variance of the Sharpe ratio estimator under non-normality
-    var_sr = (1.0 - skewness * sr_hat + ((kurt - 1.0) / 4.0) * (sr_hat**2)) / float(num_observations - 1)
+    var_sr = (1.0 - skewness * sr_hat + ((kurt - 1.0) / 4.0) * (sr_hat**2)) / float(
+        num_observations - 1
+    )
     if var_sr <= 0:
         return 1.0 if sr_hat > benchmark_sr else 0.0
 
@@ -184,6 +186,6 @@ def check_lookahead_bias(
             perturbed_signals = np.asarray(signal_fn(perturbed_df), dtype=int).ravel()
             if perturbed_signals[idx] != expected_signal:
                 raise LookAheadBiasError(
-                    f"Look-ahead bias detected: altering future price at bar {idx+2} changed past signal at bar {idx} "
+                    f"Look-ahead bias detected: altering future price at bar {idx + 2} changed past signal at bar {idx} "
                     f"from {expected_signal} to {perturbed_signals[idx]}."
                 )

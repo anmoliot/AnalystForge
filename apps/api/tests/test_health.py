@@ -41,6 +41,12 @@ async def test_invalid_request_id_is_replaced(client: httpx.AsyncClient) -> None
 async def test_security_headers_present(client: httpx.AsyncClient) -> None:
     response = await client.get("/health")
     assert response.headers["x-content-type-options"] == "nosniff"
+    assert "strict-transport-security" not in response.headers
+    assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    assert response.headers["cross-origin-resource-policy"] == "same-origin"
+    secure = await client.get("https://testserver/missing")
+    assert secure.headers["strict-transport-security"] == "max-age=31536000"
+    assert secure.headers["x-frame-options"] == "DENY"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
 

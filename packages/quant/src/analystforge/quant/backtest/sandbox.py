@@ -9,19 +9,28 @@ from __future__ import annotations
 
 import ast
 import builtins
+import importlib
 import multiprocessing
-import os
-import resource
-import signal
-import sys
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping
+from types import ModuleType
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
+resource: ModuleType | None
+try:
+    resource = importlib.import_module("resource")
+except ImportError:
+    resource = None
+
 
 class SandboxSecurityError(PermissionError):
     """Raised when custom strategy code attempts forbidden operations or sandbox escapes."""
+
+
+class SandboxUnavailableError(RuntimeError):
+    """Raised when sandbox execution is attempted on an unsupported platform (e.g. Windows)."""
 
 
 ALLOWED_MODULES = {"math", "numpy", "np", "pandas", "pd", "scipy"}
@@ -66,7 +75,13 @@ FORBIDDEN_ATTRIBUTES = {
 }
 
 
-def _safe_import(name: str, globals: Any = None, locals: Any = None, fromlist: tuple[str, ...] = (), level: int = 0) -> Any:
+def _safe_import(
+    name: str,
+    globals: Any = None,
+    locals: Any = None,
+    fromlist: tuple[str, ...] = (),
+    level: int = 0,
+) -> Any:
     root_mod = name.split(".")[0]
     if root_mod not in ALLOWED_MODULES:
         raise SandboxSecurityError(f"Forbidden runtime import: '{name}'")
@@ -128,7 +143,9 @@ def scan_code_ast(source_code: str) -> None:
             for alias in node.names:
                 mod_name = alias.name.split(".")[0]
                 if mod_name not in ALLOWED_MODULES:
-                    raise SandboxSecurityError(f"Forbidden import: '{alias.name}'. Only numpy, pandas, and math are allowed.")
+                    raise SandboxSecurityError(
+                        f"Forbidden import: '{alias.name}'. Only numpy, pandas, and math are allowed."
+                    )
         elif isinstance(node, ast.ImportFrom):
             mod_name = (node.module or "").split(".")[0]
             if mod_name not in ALLOWED_MODULES:
@@ -139,9 +156,8 @@ def scan_code_ast(source_code: str) -> None:
             if isinstance(node.func, ast.Name):
                 if node.func.id in FORBIDDEN_NAMES:
                     raise SandboxSecurityError(f"Forbidden call: '{node.func.id}'.")
-            elif isinstance(node.func, ast.Attribute):
-                if node.func.attr in FORBIDDEN_ATTRIBUTES:
-                    raise SandboxSecurityError(f"Forbidden attribute access: '{node.func.attr}'.")
+            elif isinstance(node.func, ast.Attribute) and node.func.attr in FORBIDDEN_ATTRIBUTES:
+                raise SandboxSecurityError(f"Forbidden attribute access: '{node.func.attr}'.")
 
         # 3. Direct identifier names
         elif isinstance(node, ast.Name):
@@ -149,9 +165,11 @@ def scan_code_ast(source_code: str) -> None:
                 raise SandboxSecurityError(f"Forbidden identifier: '{node.id}'.")
 
         # 4. Attribute access
-        elif isinstance(node, ast.Attribute):
-            if node.attr in FORBIDDEN_ATTRIBUTES or (node.attr.startswith("__") and node.attr.endswith("__")):
-                raise SandboxSecurityError(f"Forbidden dunder attribute access: '{node.attr}'.")
+        elif isinstance(node, ast.Attribute) and (
+            node.attr in FORBIDDEN_ATTRIBUTES
+            or (node.attr.startswith("__") and node.attr.endswith("__"))
+        ):
+            raise SandboxSecurityError(f"Forbidden dunder attribute access: '{node.attr}'.")
 
 
 def _worker_execute(
@@ -163,29 +181,20 @@ def _worker_execute(
 ) -> None:
     """Target function executed in the isolated child process."""
     try:
-        # Enforce CPU limits
-        try:
-            resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit_secs, cpu_limit_secs + 1))
-        except Exception:
-            pass
-
-        # Enforce Address Space (memory) limits if supported and safe
+        if resource is None:
+            raise SandboxUnavailableError("Unix resource limits are unavailable.")
         try:
             mem_bytes = mem_limit_mb * 1024 * 1024
-            # In 64-bit Linux, numpy/OpenBLAS pre-allocates virtual memory regions,
-            # so RLIMIT_AS must accommodate thread pool virtual reservations (minimum 2GB virtual).
-            safe_as_limit = max(mem_bytes, 2048 * 1024 * 1024)
-            resource.setrlimit(resource.RLIMIT_AS, (safe_as_limit, safe_as_limit))
-            # Also limit data segment
+            # NumPy reserves virtual address space beyond the private data segment.
+            address_limit = max(mem_bytes, 2048 * 1024 * 1024)
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit_secs, cpu_limit_secs + 1))
+            resource.setrlimit(resource.RLIMIT_AS, (address_limit, address_limit))
             resource.setrlimit(resource.RLIMIT_DATA, (mem_bytes, mem_bytes))
-        except Exception:
-            pass
-
-        # Disallow creating any new files
-        try:
             resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
-        except Exception:
-            pass
+        except (AttributeError, OSError, ValueError) as exc:
+            raise SandboxUnavailableError(
+                "Required Unix resource limits could not be installed."
+            ) from exc
 
         # Build clean execution environment
         exec_globals: dict[str, Any] = {
@@ -199,7 +208,7 @@ def _worker_execute(
         # Compile and execute code definition
         compiled = compile(source_code, "<sandboxed_strategy>", "exec")
         exec_locals: dict[str, Any] = {}
-        exec(compiled, exec_globals, exec_locals)
+        exec(compiled, exec_globals, exec_locals)  # noqa: S102 - isolated strategy subprocess
 
         fn = exec_locals.get("generate_signals") or exec_globals.get("generate_signals")
         if not callable(fn):
@@ -211,10 +220,14 @@ def _worker_execute(
             raw_arr = np.asarray(signals, dtype=int).tolist()
             result_queue.put({"success": True, "signals": raw_arr})
         else:
-            result_queue.put({
-                "success": False,
-                "error": f"generate_signals returned unsupported type {type(signals).__name__}, expected Series or array",
-            })
+            result_queue.put(
+                {
+                    "success": False,
+                    "error": f"generate_signals returned unsupported type {type(signals).__name__}, expected Series or array",
+                }
+            )
+    except SandboxUnavailableError as exc:
+        result_queue.put({"success": False, "unavailable": True, "error": str(exc)})
     except Exception as exc:
         result_queue.put({"success": False, "error": f"{type(exc).__name__}: {exc}"})
 
@@ -244,6 +257,13 @@ def run_sandboxed_strategy(
     # Step 1: Pre-execution AST scan
     scan_code_ast(source_code)
 
+    # Check for platform capability (resource module and Unix subprocess controls)
+    if resource is None:
+        raise SandboxUnavailableError(
+            "Sandboxed strategy execution requires Unix resource limits (RLIMIT_CPU, RLIMIT_AS, RLIMIT_DATA, RLIMIT_FSIZE) "
+            "and is not supported on Windows."
+        )
+
     # Step 2: Spawn isolated subprocess
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue[Any] = ctx.Queue()
@@ -259,19 +279,27 @@ def run_sandboxed_strategy(
     if proc.is_alive():
         proc.kill()
         proc.join()
-        raise TimeoutError(f"Strategy execution exceeded wall-time limit of {wall_time_timeout} seconds.")
+        raise TimeoutError(
+            f"Strategy execution exceeded wall-time limit of {wall_time_timeout} seconds."
+        )
 
     if queue.empty():
         exit_code = proc.exitcode
-        raise RuntimeError(f"Strategy worker process terminated unexpectedly with exit code {exit_code}.")
+        raise RuntimeError(
+            f"Strategy worker process terminated unexpectedly with exit code {exit_code}."
+        )
 
     res = queue.get()
     if not res.get("success"):
         err_msg = res.get("error", "Unknown error in strategy execution")
+        if res.get("unavailable"):
+            raise SandboxUnavailableError(err_msg)
         raise RuntimeError(err_msg)
 
     signals: list[int] = res["signals"]
     if len(signals) != len(df):
-        raise ValueError(f"Strategy returned {len(signals)} signals, but price dataframe has {len(df)} rows.")
+        raise ValueError(
+            f"Strategy returned {len(signals)} signals, but price dataframe has {len(df)} rows."
+        )
 
     return signals

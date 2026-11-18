@@ -104,7 +104,9 @@ async def integrations(request: Request) -> dict[str, Any]:
         "llm": {
             "provider": settings.llm_provider,
             "configured": llm_provider.is_configured(),
-            "base_url": settings.llm_base_url if settings.llm_provider in {"openai-compatible", "openai", "groq"} else None,
+            "base_url": settings.llm_base_url
+            if settings.llm_provider in {"openai-compatible", "openai", "groq"}
+            else None,
             "configured_model": settings.llm_model,
             "fallback_model": settings.llm_fallback_model,
             "resolved_model": resolved_model,

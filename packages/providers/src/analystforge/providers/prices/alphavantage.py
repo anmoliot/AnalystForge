@@ -76,9 +76,7 @@ class AlphaVantagePricesProvider(PricesProvider):
         )
         return self._parse(clean_symbol, payload, start, end)
 
-    def _parse(
-        self, symbol: str, payload: Any, start: date, end: date
-    ) -> PriceSeries:
+    def _parse(self, symbol: str, payload: Any, start: date, end: date) -> PriceSeries:
         if not isinstance(payload, dict):
             raise ProviderDataError(self.name, "response is not a valid JSON dictionary")
 

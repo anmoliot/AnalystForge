@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Query, Request, Response
+from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 
 from analystforge.api.deps import CurrentUser, SessionDep
-from analystforge.api.errors import NotFoundError, PermissionDeniedError
+from analystforge.api.errors import NotFoundError
 from analystforge.api.models.valuation import ValuationModel, ValuationVersion
 from analystforge.api.services.valuation import (
     compute_monte_carlo,
@@ -233,7 +233,9 @@ async def monte_carlo(
     return compute_monte_carlo(body.model_dump(), iterations=iterations, seed=seed)
 
 
-@router.post("/dcf/export/excel", summary="Export DCF model as an Excel workbook with live formulas")
+@router.post(
+    "/dcf/export/excel", summary="Export DCF model as an Excel workbook with live formulas"
+)
 async def export_excel(body: DCFRequest) -> Response:
     params = body.model_dump()
     result = execute_dcf(params)
@@ -257,12 +259,16 @@ async def calculate_ddm(body: DDMRequest) -> dict[str, Any]:
     return execute_ddm(body.model_dump())
 
 
-@router.post("/residual-income", summary="Calculate Residual Income (Edwards-Bell-Ohlson) valuation")
+@router.post(
+    "/residual-income", summary="Calculate Residual Income (Edwards-Bell-Ohlson) valuation"
+)
 async def calculate_residual_income(body: ResidualIncomeRequest) -> dict[str, Any]:
     return execute_residual_income(body.model_dump())
 
 
-@router.post("/comps", summary="Calculate Comparable Companies multiple distribution and valuation ranges")
+@router.post(
+    "/comps", summary="Calculate Comparable Companies multiple distribution and valuation ranges"
+)
 async def calculate_comps(body: CompsRequest) -> dict[str, Any]:
     return execute_comps(body.model_dump())
 
@@ -272,17 +278,23 @@ async def calculate_sotp(body: SOTPRequest) -> dict[str, Any]:
     return execute_sotp(body.model_dump())
 
 
-@router.post("/precedents", summary="Calculate Precedent Transactions M&A multiple valuation ranges")
+@router.post(
+    "/precedents", summary="Calculate Precedent Transactions M&A multiple valuation ranges"
+)
 async def calculate_precedents(body: PrecedentsRequest) -> dict[str, Any]:
     return execute_precedents(body.model_dump())
 
 
-@router.post("/wacc-builder", summary="Derive WACC with CAPM, Blume adjustment, and FRED risk-free rate")
+@router.post(
+    "/wacc-builder", summary="Derive WACC with CAPM, Blume adjustment, and FRED risk-free rate"
+)
 async def derive_wacc(body: WACCBuilderRequest, session: SessionDep) -> dict[str, Any]:
     return await execute_wacc_builder(session, body.model_dump())
 
 
-@router.post("/football-field", summary="Consolidate multiple valuation ranges into a Football Field summary")
+@router.post(
+    "/football-field", summary="Consolidate multiple valuation ranges into a Football Field summary"
+)
 async def calculate_football_field(body: FootballFieldRequest) -> dict[str, Any]:
     return execute_football_field(body.model_dump())
 

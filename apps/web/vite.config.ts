@@ -13,10 +13,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:8000",
-      "/health": "http://localhost:8000",
-      "/ready": "http://localhost:8000",
-      "/metrics": "http://localhost:8000",
+      "/api": process.env.AF_API_ORIGIN ?? "http://127.0.0.1:8000",
+      "/health": process.env.AF_API_ORIGIN ?? "http://127.0.0.1:8000",
+      "/ready": process.env.AF_API_ORIGIN ?? "http://127.0.0.1:8000",
+      "/metrics": process.env.AF_API_ORIGIN ?? "http://127.0.0.1:8000",
     },
   },
   build: {
@@ -26,6 +26,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
     css: false,
   },

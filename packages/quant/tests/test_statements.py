@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 
 import pytest
+from quant_fixtures import D, fact_for, make_statements
 
 from analystforge.quant.statements import (
     FinancialFact,
@@ -18,8 +18,6 @@ from analystforge.quant.statements import (
     ttm_from_ytd,
     ttm_value,
 )
-
-from quant_fixtures import D, fact_for, make_statements
 
 FY = FiscalPeriod.FY.value
 

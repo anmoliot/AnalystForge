@@ -4,22 +4,19 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 import respx
 
 from analystforge.providers.base import Capability
 from analystforge.providers.errors import (
     AllProvidersFailedError,
-    ProviderDataError,
     ProviderError,
     ProviderNotConfiguredError,
 )
 from analystforge.providers.prices.alphavantage import AlphaVantagePricesProvider
-from analystforge.providers.prices.stooq import StooqProvider
 from analystforge.providers.prices.twelvedata import TwelveDataPricesProvider
-from analystforge.providers.prices.yahoo import YahooPricesProvider
 from analystforge.providers.registry import ProviderConfig, build_registry
-from analystforge.providers.router import ProviderRouter
 
 
 @pytest.mark.asyncio
@@ -89,7 +86,9 @@ async def test_alphavantage_rate_limiting_notice():
     provider = AlphaVantagePricesProvider(user_agent="AnalystForge/Test", api_key="demo_key")
     respx.get("https://www.alphavantage.co/query").respond(
         200,
-        json={"Note": "Thank you for using Alpha Vantage! Standard call frequency is 5 calls per min."},
+        json={
+            "Note": "Thank you for using Alpha Vantage! Standard call frequency is 5 calls per min."
+        },
     )
     with pytest.raises(ProviderError) as exc_info:
         await provider.fetch_bars("AAPL", date(2024, 1, 1), date(2024, 1, 10))

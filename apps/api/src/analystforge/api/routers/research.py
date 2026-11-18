@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import selectinload
 
 from analystforge.api.deps import CurrentUser, CurrentUserOptional, SessionDep
-from analystforge.api.models.core import User
 from analystforge.api.models.market import Instrument
 from analystforge.api.models.news import NewsArticle, NewsArticleInstrument
-from analystforge.api.models.rag import DocumentChunk, ResearchMessage, ResearchSession
+from analystforge.api.models.rag import ResearchSession
 from analystforge.api.models.research import Filing, FundamentalFact
 from analystforge.api.services.filings_analytics import (
     diff_filing_sections,
@@ -24,7 +22,6 @@ from analystforge.api.services.filings_analytics import (
     parse_filing_sections,
 )
 from analystforge.api.services.news_analytics import (
-    analyze_sentiment,
     cluster_articles,
     get_sentiment_price_overlay,
 )
@@ -323,7 +320,9 @@ async def get_filings_section_diff(
     return diff_filing_sections(prior, current)
 
 
-@router.get("/filings/{ticker}/metrics", summary="Extract key financial metrics from fundamental facts")
+@router.get(
+    "/filings/{ticker}/metrics", summary="Extract key financial metrics from fundamental facts"
+)
 async def get_filings_key_metrics(
     ticker: str,
     session: SessionDep,
@@ -336,13 +335,17 @@ async def get_filings_key_metrics(
         raise HTTPException(status_code=404, detail=f"Instrument '{ticker_clean}' not found")
 
     facts = (
-        await session.execute(
-            select(FundamentalFact)
-            .where(FundamentalFact.instrument_id == inst.id)
-            .order_by(desc(FundamentalFact.period_end))
-            .limit(50)
+        (
+            await session.execute(
+                select(FundamentalFact)
+                .where(FundamentalFact.instrument_id == inst.id)
+                .order_by(desc(FundamentalFact.period_end))
+                .limit(50)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return extract_key_metrics(facts)
 

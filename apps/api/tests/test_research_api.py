@@ -1,6 +1,7 @@
 """Tests for Grounded Research Assistant & RAG API (Phase 9)."""
 
 import uuid
+
 import pytest
 from httpx import AsyncClient
 

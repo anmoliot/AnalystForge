@@ -30,9 +30,9 @@ def black_litterman(
     covariance: Sequence[Sequence[float]],
     market_weights: Sequence[float],
     *,
-    views_matrix: Sequence[Sequence[float]] | None = None,  # P matrix (K x N)
-    views_returns: Sequence[float] | None = None,  # Q vector (K)
-    views_uncertainty: Sequence[Sequence[float]] | None = None,  # Omega matrix (K x K)
+    views_matrix: Sequence[Sequence[float]] | None = None,  # p matrix (K x N)
+    views_returns: Sequence[float] | None = None,  # q vector (K)
+    views_uncertainty: Sequence[Sequence[float]] | None = None,  # omega matrix (K x K)
     risk_aversion: float = 2.5,  # Typical delta in empirical finance
     tau: float = 0.05,
     risk_free_rate: float = 0.0,
@@ -43,11 +43,11 @@ def black_litterman(
     ----------
     covariance : Asset covariance matrix Sigma (N x N).
     market_weights : Benchmark or market capitalization weights w_mkt (sums to 1.0).
-    views_matrix : K x N matrix P expressing asset combinations for each view.
-    views_returns : Length-K vector Q expressing expected returns for each view.
-    views_uncertainty : K x K diagonal matrix Omega of view variance/uncertainty.
+    views_matrix : K x N matrix p expressing asset combinations for each view.
+    views_returns : Length-K vector q expressing expected returns for each view.
+    views_uncertainty : K x K diagonal matrix omega of view variance/uncertainty.
                         If None, uses He-Litterman proportional formulation:
-                        Omega = diag(P * (tau * Sigma) * P^T).
+                        omega = diag(p * (tau * Sigma) * p^T).
     risk_aversion : Coefficient of risk aversion delta = (r_mkt - r_f) / sigma_mkt^2.
     tau : Weight on prior covariance (typical range [0.01, 0.1]).
     risk_free_rate : Risk-free rate to convert between total and excess returns.
@@ -87,37 +87,37 @@ def black_litterman(
             tau=tau,
         )
 
-    P = np.asarray(views_matrix, dtype=np.float64)
-    Q = np.asarray(views_returns, dtype=np.float64).ravel()
-    k_views = P.shape[0]
+    p = np.asarray(views_matrix, dtype=np.float64)
+    q = np.asarray(views_returns, dtype=np.float64).ravel()
+    k_views = p.shape[0]
 
-    if P.shape != (k_views, n_assets):
-        raise ValueError(f"Views matrix P must have dimensions (K x N), got {P.shape}.")
-    if Q.size != k_views:
-        raise ValueError(f"Views returns Q length ({Q.size}) must match views count ({k_views}).")
+    if p.shape != (k_views, n_assets):
+        raise ValueError(f"Views matrix p must have dimensions (K x N), got {p.shape}.")
+    if q.size != k_views:
+        raise ValueError(f"Views returns q length ({q.size}) must match views count ({k_views}).")
 
-    # If Omega not provided, use He-Litterman default: diag(P * (tau * Sigma) * P^T)
+    # If omega not provided, use He-Litterman default: diag(p * (tau * Sigma) * p^T)
     tau_cov = tau * cov
     if views_uncertainty is None:
-        view_cov = P @ tau_cov @ P.T
-        Omega = np.diag(np.diag(view_cov))
+        view_cov = p @ tau_cov @ p.T
+        omega = np.diag(np.diag(view_cov))
     else:
-        Omega = np.asarray(views_uncertainty, dtype=np.float64)
-        if Omega.shape != (k_views, k_views):
-            raise ValueError(f"Omega must be (K x K), got {Omega.shape}.")
+        omega = np.asarray(views_uncertainty, dtype=np.float64)
+        if omega.shape != (k_views, k_views):
+            raise ValueError(f"omega must be (K x K), got {omega.shape}.")
 
-    # Invert tau * Sigma and Omega
+    # Invert tau * Sigma and omega
     inv_tau_cov = np.linalg.pinv(tau_cov)
-    inv_Omega = np.linalg.pinv(Omega)
+    inv_omega = np.linalg.pinv(omega)
 
     # Master formula:
-    # M = [ (tau * Sigma)^(-1) + P^T * Omega^(-1) * P ]^(-1)
-    # E[R] = M * [ (tau * Sigma)^(-1) * Pi + P^T * Omega^(-1) * Q ]
-    M = np.linalg.pinv(inv_tau_cov + (P.T @ inv_Omega @ P))
-    er_excess = M @ (inv_tau_cov @ pi + (P.T @ inv_Omega @ Q))
+    # m = [ (tau * Sigma)^(-1) + p^T * omega^(-1) * p ]^(-1)
+    # E[R] = m * [ (tau * Sigma)^(-1) * Pi + p^T * omega^(-1) * q ]
+    m = np.linalg.pinv(inv_tau_cov + (p.T @ inv_omega @ p))
+    er_excess = m @ (inv_tau_cov @ pi + (p.T @ inv_omega @ q))
 
-    # Posterior covariance of asset returns: Sigma_post = Sigma + M
-    sigma_post = cov + M
+    # Posterior covariance of asset returns: Sigma_post = Sigma + m
+    sigma_post = cov + m
 
     # Optimal weights: w = (delta * Sigma_post)^(-1) * er_excess
     # Normalized so sum(w) = 1.0

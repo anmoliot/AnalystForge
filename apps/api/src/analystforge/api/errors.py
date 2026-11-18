@@ -53,6 +53,10 @@ class RateLimitError(AppError):
     status_code = 429
     code = "rate_limited"
 
+    def __init__(self, retry_after: int) -> None:
+        super().__init__("Request limit exceeded. Try again after the indicated delay.")
+        self.retry_after = retry_after
+
 
 class ProviderUnavailableError(AppError):
     status_code = 503

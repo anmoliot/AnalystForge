@@ -40,7 +40,9 @@ async def create_note(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         entity_type=payload.entity_type,
-        entity_id=payload.entity_id.upper() if payload.entity_type == "ticker" else payload.entity_id,
+        entity_id=payload.entity_id.upper()
+        if payload.entity_type == "ticker"
+        else payload.entity_id,
         title=payload.title,
         content=payload.content,
         tags=payload.tags,

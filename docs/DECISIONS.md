@@ -436,3 +436,26 @@ vendor errors.
 
 
 
+
+## WP10 request quotas
+
+All versioned API routes share a 60-second quota per verified API key, authenticated user or anonymous client IP. Authentication writes share a stricter IP quota. Key creation uses the authenticated identity. Password reset, if added under the auth router, inherits the strict quota. Probes remain available independently. Redis increments and expiration are atomic. On Redis failure each process enforces a fresh local quota and retries Redis after five seconds. A full local counter table rejects new identities until space expires. During failover or with several workers, the effective allowance can increase.
+
+## WP10 audit and verification decisions
+
+Every HTTP mutation is audited after the application request finishes in a separate transaction.
+Verified authentication attaches actor and tenant identities. Anonymous failures retain null identities.
+Rows record action, resource UUID where available, status, request ID and UTC time.
+Bodies, credentials and share tokens are excluded. Failed writes increment
+`analystforge_audit_write_failures_total` and log the exception class.
+
+Browser verification defaults to ephemeral SQLite locally. CI uses a disposable PostgreSQL
+database whose name ends in `_test`. Recorded fixtures preserve providers and dates.
+DCF retains its field form. Other valuation methods accept explicit JSON assumptions to remove
+automatic calculations from fixed example company figures. Reports use recorded closing prices
+and disclose unavailable data. Excel formulas await sourced user inputs.
+
+Three exact history fingerprints are excluded from Gitleaks because they are public mock/test
+constants. Current signing keys are generated and the mock settings key was removed.
+Published history was retained. The web CSP allows same-origin scripts and inline styles used by
+React layouts/charts. Theme initialization is external. HSTS depends on the actual HTTPS scheme.

@@ -41,7 +41,9 @@ class ValuationModel(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text)
 
     versions: Mapped[list[ValuationVersion]] = relationship(
-        back_populates="model", cascade="all, delete-orphan", order_by="desc(ValuationVersion.version_number)"
+        back_populates="model",
+        cascade="all, delete-orphan",
+        order_by="desc(ValuationVersion.version_number)",
     )
 
 

@@ -97,9 +97,9 @@ interface SweepResult {
   ticker: string;
   strategy_name: string;
   param1_name: string;
-  param1_values: unknown[];
+  param1_values: (number | string)[];
   param2_name: string;
-  param2_values: unknown[];
+  param2_values: (number | string)[];
   sharpe_matrix: (number | null)[][];
   return_matrix: number[][];
   drawdown_matrix: number[][];
@@ -165,7 +165,7 @@ def generate_signals(df):
   // Recent runs
   const { data: recentRuns = [], refetch: refetchRuns } = useQuery({
     queryKey: ["backtest-runs"],
-    queryFn: () => api.get<Array<Record<string, unknown>>>("/api/v1/backtests"),
+    queryFn: () => api.get<Array<Pick<BacktestRunDetail, "id" | "ticker" | "strategy_name" | "total_return">>>("/api/v1/backtests"),
   });
 
   // Standard Backtest Mutation
@@ -329,7 +329,7 @@ def generate_signals(df):
 
         <div className="flex items-center gap-2">
           {recentRuns.length > 0 && (
-            <select
+            <select aria-label="Backtest selection"
               onChange={(e) => e.target.value && handleSelectHistorical(e.target.value)}
               className="rounded border border-line bg-elevated px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
               defaultValue=""
@@ -363,8 +363,8 @@ def generate_signals(df):
       </div>
 
       {/* Survivorship Bias Warning Notice */}
-      <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-        <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-400" />
+      <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-warning">
+        <AlertTriangle className="size-4 shrink-0 mt-0.5 text-warning" />
         <div>
           <span className="font-semibold">Survivorship Bias Disclosure:</span> Simulated metrics reflect surviving securities over historical price intervals. Delisted entities, corporate liquidations, and failed listings are not modeled, which may bias backtested returns upwards compared to live execution.
         </div>
@@ -424,7 +424,7 @@ def generate_signals(df):
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6 text-xs mb-3">
           <div>
             <label className="mb-1 block text-2xs font-medium uppercase text-muted">Asset Ticker</label>
-            <input
+            <input aria-label="Asset Ticker"
               type="text"
               value={ticker}
               onChange={(e) => setTicker(e.target.value.toUpperCase())}
@@ -434,7 +434,7 @@ def generate_signals(df):
 
           <div>
             <label className="mb-1 block text-2xs font-medium uppercase text-muted">Initial Capital ($)</label>
-            <input
+            <input aria-label="Initial Capital ($)"
               type="number"
               value={capital}
               onChange={(e) => setCapital(Number(e.target.value))}
@@ -444,7 +444,7 @@ def generate_signals(df):
 
           <div>
             <label className="mb-1 block text-2xs font-medium uppercase text-muted">Commission / Trade ($)</label>
-            <input
+            <input aria-label="Commission / Trade ($)"
               type="number"
               step="0.5"
               value={commissionPerTrade}
@@ -455,7 +455,7 @@ def generate_signals(df):
 
           <div>
             <label className="mb-1 block text-2xs font-medium uppercase text-muted">Slippage (bps)</label>
-            <input
+            <input aria-label="Slippage (bps)"
               type="number"
               step="1"
               value={slippageBps}
@@ -466,7 +466,7 @@ def generate_signals(df):
 
           <div>
             <label className="mb-1 block text-2xs font-medium uppercase text-muted">Short Borrow Rate (%/yr)</label>
-            <input
+            <input aria-label="Short Borrow Rate (%/yr)"
               type="number"
               step="0.5"
               value={borrowCostPct}
@@ -493,7 +493,7 @@ def generate_signals(df):
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs pt-3 border-t border-line">
             <div>
               <label className="mb-1 block text-2xs font-medium uppercase text-muted">Strategy Model</label>
-              <select
+              <select aria-label="Backtest selection"
                 value={strategy}
                 onChange={(e) => setStrategy(e.target.value)}
                 className="w-full rounded border border-line bg-elevated px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
@@ -509,7 +509,7 @@ def generate_signals(df):
               <>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Fast SMA Window</label>
-                  <input
+                  <input aria-label="Fast SMA Window"
                     type="number"
                     value={fastPeriod}
                     onChange={(e) => setFastPeriod(Number(e.target.value))}
@@ -518,7 +518,7 @@ def generate_signals(df):
                 </div>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Slow SMA Window</label>
-                  <input
+                  <input aria-label="Slow SMA Window"
                     type="number"
                     value={slowPeriod}
                     onChange={(e) => setSlowPeriod(Number(e.target.value))}
@@ -532,7 +532,7 @@ def generate_signals(df):
               <>
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">RSI Period</label>
-                  <input
+                  <input aria-label="RSI Period"
                     type="number"
                     value={rsiPeriod}
                     onChange={(e) => setRsiPeriod(Number(e.target.value))}
@@ -542,7 +542,7 @@ def generate_signals(df):
                 <div>
                   <label className="mb-1 block text-2xs font-medium uppercase text-muted">Oversold / Overbought</label>
                   <div className="flex gap-2">
-                    <input
+                    <input aria-label="Oversold / Overbought"
                       type="number"
                       value={oversold}
                       onChange={(e) => setOversold(Number(e.target.value))}
@@ -569,7 +569,7 @@ def generate_signals(df):
             <div className="grid gap-3 sm:grid-cols-4 text-xs">
               <div>
                 <label className="mb-1 block text-2xs text-muted">Technical Indicator</label>
-                <select
+                <select aria-label="Technical Indicator"
                   value={ruleIndicator}
                   onChange={(e) => setRuleIndicator(e.target.value)}
                   className="w-full rounded border border-line bg-elevated px-2 py-1.5 text-ink"
@@ -586,7 +586,7 @@ def generate_signals(df):
 
               <div>
                 <label className="mb-1 block text-2xs text-muted">Indicator Window</label>
-                <input
+                <input aria-label="Indicator Window"
                   type="number"
                   value={ruleParamWindow}
                   onChange={(e) => setRuleParamWindow(Number(e.target.value))}
@@ -596,7 +596,7 @@ def generate_signals(df):
 
               <div>
                 <label className="mb-1 block text-2xs text-muted">Operator</label>
-                <select
+                <select aria-label="Operator"
                   value={ruleOp}
                   onChange={(e) => setRuleOp(e.target.value)}
                   className="w-full rounded border border-line bg-elevated px-2 py-1.5 text-ink"
@@ -612,7 +612,7 @@ def generate_signals(df):
 
               <div>
                 <label className="mb-1 block text-2xs text-muted">Threshold Value</label>
-                <input
+                <input aria-label="Threshold Value"
                   type="number"
                   step="0.5"
                   value={ruleThreshold}
@@ -677,12 +677,12 @@ def generate_signals(df):
           <div className="flex items-center justify-between text-2xs text-muted">
             <span>STRATEGY TOTAL RETURN</span>
             {totRet >= 0 ? (
-              <ArrowUpRight className="size-3.5 text-emerald-400" />
+              <ArrowUpRight className="size-3.5 text-accent" />
             ) : (
-              <ArrowDownRight className="size-3.5 text-rose-400" />
+              <ArrowDownRight className="size-3.5 text-negative" />
             )}
           </div>
-          <div className={`text-xl font-bold font-mono ${totRet >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+          <div className={`text-xl font-bold font-mono ${totRet >= 0 ? "text-accent" : "text-negative"}`}>
             {totRet >= 0 ? "+" : ""}{formatPercent(totRet, 2)}
           </div>
           <div className="text-2xs text-muted">
@@ -698,7 +698,7 @@ def generate_signals(df):
           <div className="text-xl font-bold font-mono">
             {formatPercent(benchmarkReturn, 2)}
           </div>
-          <div className={`text-2xs font-mono ${alpha >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+          <div className={`text-2xs font-mono ${alpha >= 0 ? "text-accent" : "text-negative"}`}>
             Alpha: {alpha >= 0 ? "+" : ""}{formatPercent(alpha, 2)}
           </div>
         </Panel>
@@ -706,7 +706,7 @@ def generate_signals(df):
         <Panel className="space-y-1 p-3">
           <div className="flex items-center justify-between text-2xs text-muted">
             <span>RISK & WIN RATE</span>
-            <Activity className="size-3.5 text-amber-400" />
+            <Activity className="size-3.5 text-warning" />
           </div>
           <div className="text-xl font-bold font-mono">
             {activeRun?.sharpe_ratio !== null && activeRun?.sharpe_ratio !== undefined
@@ -716,7 +716,7 @@ def generate_signals(df):
           </div>
           <div className="text-2xs text-muted">
             Win Rate:{" "}
-            <span className="font-mono text-emerald-400">
+            <span className="font-mono text-accent">
               {activeRun ? formatPercent(activeRun.win_rate, 1) : "—"}
             </span>{" "}
             ({activeRun?.trades_count ?? 0} trades)
@@ -738,7 +738,7 @@ def generate_signals(df):
           </div>
 
           {walkForwardData.overfitting_warning && (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200">
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-warning">
               {walkForwardData.overfitting_warning}
             </div>
           )}
@@ -767,7 +767,7 @@ def generate_signals(df):
                     <td className="px-3 py-2 text-right font-mono font-medium">{f.oos_sharpe !== null ? formatNumber(f.oos_sharpe, 2) : "—"}</td>
                     <td className="px-3 py-2 text-right font-mono">{formatPercent(f.is_return, 2)}</td>
                     <td className="px-3 py-2 text-right font-mono">{formatPercent(f.oos_return, 2)}</td>
-                    <td className={`px-3 py-2 text-right font-mono ${f.sharpe_degradation_pct <= -50 ? "text-rose-400" : "text-emerald-400"}`}>
+                    <td className={`px-3 py-2 text-right font-mono ${f.sharpe_degradation_pct <= -50 ? "text-negative" : "text-accent"}`}>
                       {formatNumber(f.sharpe_degradation_pct, 1)}%
                     </td>
                   </tr>
@@ -795,7 +795,7 @@ def generate_signals(df):
           </div>
 
           {sweepData.overfitting_warning && (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200">
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-warning">
               {sweepData.overfitting_warning}
             </div>
           )}
@@ -818,7 +818,7 @@ def generate_signals(df):
                     </td>
                     {row.map((val, cIdx) => {
                       const num = val ?? 0;
-                      const bg = num > 1.5 ? "bg-emerald-500/30 text-emerald-300" : (num > 0.5 ? "bg-blue-500/20 text-blue-300" : "bg-rose-500/20 text-rose-300");
+                      const bg = num > 1.5 ? "bg-emerald-500/30 text-accent" : (num > 0.5 ? "bg-blue-500/20 text-accent" : "bg-rose-500/20 text-negative");
                       return (
                         <td key={cIdx} className={`px-3 py-2 font-mono font-medium ${bg}`}>
                           {val !== null ? formatNumber(val, 2) : "—"}
@@ -857,7 +857,7 @@ def generate_signals(df):
                   tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
-                  formatter={(val: any) => [`$${formatNumber(Number(val), 2)}`, ""]}
+                  formatter={(val: number | string | (number | string)[]) => [`$${formatNumber(Number(val), 2)}`, ""]}
                   labelStyle={{ fontSize: 11 }}
                   contentStyle={{ backgroundColor: "#1e222d", borderColor: "#2a2e39", fontSize: 11 }}
                 />
@@ -940,14 +940,14 @@ def generate_signals(df):
                         </td>
                         <td
                           className={`px-3.5 py-2 text-right font-mono font-medium ${
-                            pnl >= 0 ? "text-emerald-400" : "text-rose-400"
+                            pnl >= 0 ? "text-accent" : "text-negative"
                           }`}
                         >
                           {pnl >= 0 ? "+" : ""}${formatNumber(pnl, 2)}
                         </td>
                         <td
                           className={`px-3.5 py-2 text-right font-mono ${
-                            pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
+                            pnlPct >= 0 ? "text-accent" : "text-negative"
                           }`}
                         >
                           {pnlPct >= 0 ? "+" : ""}{formatPercent(pnlPct, 2)}

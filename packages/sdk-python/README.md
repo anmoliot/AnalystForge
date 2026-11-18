@@ -26,8 +26,7 @@ with AnalystForgeClient(base_url="http://localhost:8000", api_key="af_live_secre
 
     # 3. Grounded AI Research with Citations
     research = client.query_research(
-        query="What are Apple's primary revenue drivers and regulatory risks?",
-        ticker="AAPL"
+        query="What are Apple's primary revenue drivers and regulatory risks?", ticker="AAPL"
     )
     print("Answer:", research["answer"])
     for cite in research["citations"]:
@@ -39,7 +38,7 @@ with AnalystForgeClient(base_url="http://localhost:8000", api_key="af_live_secre
         title="Apple Inc. Comprehensive Tearsheet",
         report_type="TEARSHEET",
         ticker="AAPL",
-        format="PDF"
+        format="PDF",
     )
     report_id = report["id"]
 

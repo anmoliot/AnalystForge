@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from analystforge.quant.money import ZERO, quantize, to_decimal
-from analystforge.quant.multiples import peer_statistics
 
 
 def _finite(value: Decimal, name: str) -> Decimal:

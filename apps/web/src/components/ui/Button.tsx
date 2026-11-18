@@ -16,7 +16,7 @@ const variants: Record<Variant, string> = {
     "bg-accent text-accent-ink hover:brightness-110 active:brightness-95 border border-transparent",
   secondary: "bg-elevated text-ink border border-line hover:border-muted/50 hover:bg-panel",
   ghost: "bg-transparent text-muted hover:bg-elevated hover:text-ink border border-transparent",
-  danger: "bg-negative text-white hover:brightness-110 border border-transparent",
+  danger: "bg-negative text-ink hover:brightness-110 border border-transparent",
 };
 
 const sizes: Record<Size, string> = {

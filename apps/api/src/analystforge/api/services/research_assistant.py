@@ -11,15 +11,18 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.models.market import Instrument, PriceBar
-from analystforge.api.models.rag import DocumentChunk, ResearchCallLog, ResearchMessage, ResearchSession
-from analystforge.api.models.research import Filing, FundamentalFact
+from analystforge.api.models.rag import (
+    ResearchCallLog,
+    ResearchMessage,
+    ResearchSession,
+)
 from analystforge.api.services.llm import get_llm_provider
 from analystforge.api.services.retrieval import retrieve_relevant_passages
-from analystforge.providers.llm import ChatMessage, LLMProvider, LLMRateLimitError, ToolCall
+from analystforge.providers.llm import ChatMessage, LLMProvider, LLMRateLimitError
 
 logger = structlog.get_logger("services.research_assistant")
 
@@ -29,8 +32,14 @@ _UNSUPPORTED_PATTERNS = [
     re.compile(r"\bwill\b.*\b(stock|price|double|reach|be on|tomorrow|next week|2030)\b", re.I),
     re.compile(r"\b(stock price be|target price on|what will .* be in 2030)\b", re.I),
     re.compile(r"\b(home address|private phone|dog\'s name|lottery numbers)\b", re.I),
-    re.compile(r"\b(mars|neptune|asteroid|immortality|hogwarts|wayne enterprises|cyberdyne|extraterrestrial|submarines in antarctica|horoscopes|looney tunes|acme corporation|galactic empire|darth vader|roman empire|emperor augustus)\b", re.I),
-    re.compile(r"\b(secretly buy|give all .* for free|replace all usd with bitcoin|secret recipe|cafeteria coffee)\b", re.I),
+    re.compile(
+        r"\b(mars|neptune|asteroid|immortality|hogwarts|wayne enterprises|cyberdyne|extraterrestrial|submarines in antarctica|horoscopes|looney tunes|acme corporation|galactic empire|darth vader|roman empire|emperor augustus)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(secretly buy|give all .* for free|replace all usd with bitcoin|secret recipe|cafeteria coffee)\b",
+        re.I,
+    ),
     re.compile(r"\breplace all\b.*\b(bitcoin|usd|us dollars?|cash|currency)\b", re.I),
 ]
 
@@ -41,9 +50,13 @@ def is_unsupported_query(query: str, passages: list[dict[str, Any]]) -> bool:
         return True
     if not passages:
         return True
-    if all(p.get("lexical_score", 0.0) == 0.0 and p.get("semantic_score", 0.0) < 0.05 for p in passages):
-        return True
-    return False
+    return bool(
+        all(
+            p.get("lexical_score", 0.0) == 0.0 and p.get("semantic_score", 0.0) < 0.05
+            for p in passages
+        )
+    )
+
 
 # ---------------------------------------------------------------------------
 # Audited Tool Definitions
@@ -58,7 +71,10 @@ RESEARCH_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "ticker": {"type": "string", "description": "Ticker symbol, e.g. AAPL, NVDA, SHEL.L"},
+                    "ticker": {
+                        "type": "string",
+                        "description": "Ticker symbol, e.g. AAPL, NVDA, SHEL.L",
+                    },
                 },
                 "required": ["ticker"],
             },
@@ -73,7 +89,11 @@ RESEARCH_TOOLS = [
                 "type": "object",
                 "properties": {
                     "ticker": {"type": "string", "description": "Ticker symbol"},
-                    "days": {"type": "integer", "description": "Number of days of history", "default": 30},
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days of history",
+                        "default": 30,
+                    },
                 },
                 "required": ["ticker"],
             },
@@ -88,7 +108,10 @@ RESEARCH_TOOLS = [
                 "type": "object",
                 "properties": {
                     "pe_max": {"type": "number", "description": "Maximum Price-to-Earnings ratio"},
-                    "roe_min": {"type": "number", "description": "Minimum Return on Equity percentage"},
+                    "roe_min": {
+                        "type": "number",
+                        "description": "Minimum Return on Equity percentage",
+                    },
                     "sector": {"type": "string", "description": "Target industry sector"},
                 },
             },
@@ -103,8 +126,16 @@ RESEARCH_TOOLS = [
                 "type": "object",
                 "properties": {
                     "ticker": {"type": "string", "description": "Ticker symbol"},
-                    "wacc": {"type": "number", "description": "Discount rate / WACC (e.g. 0.09)", "default": 0.09},
-                    "terminal_growth": {"type": "number", "description": "Terminal growth rate (e.g. 0.025)", "default": 0.025},
+                    "wacc": {
+                        "type": "number",
+                        "description": "Discount rate / WACC (e.g. 0.09)",
+                        "default": 0.09,
+                    },
+                    "terminal_growth": {
+                        "type": "number",
+                        "description": "Terminal growth rate (e.g. 0.025)",
+                        "default": 0.025,
+                    },
                 },
                 "required": ["ticker"],
             },
@@ -121,52 +152,47 @@ async def execute_tool(
     """Execute an audited tool function with strict bounds."""
     if name == "get_ratios":
         ticker = str(args.get("ticker", "")).upper().strip()
-        inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+        inst = (
+            await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+        ).scalar_one_or_none()
         if not inst:
             return {"error": f"Instrument '{ticker}' not found"}
 
-        # Query fundamental facts for this instrument
-        facts = (
-            await session.execute(
-                select(FundamentalFact)
-                .where(FundamentalFact.instrument_id == inst.id)
-                .order_by(desc(FundamentalFact.period_end))
-                .limit(20)
-            )
-        ).scalars().all()
+        from analystforge.api.services.company import get_company_ratios
 
-        concept_map = {f.concept: float(f.value) for f in facts}
-        rev = concept_map.get("Revenues") or concept_map.get("SalesRevenueNet") or 100_000_000_000.0
-        ni = concept_map.get("NetIncomeLoss") or 25_000_000_000.0
-        eps = concept_map.get("EarningsPerShareDiluted") or 6.50
-
+        ratios = await get_company_ratios(session, inst)
+        by_key = {item["key"]: item["value"] for item in ratios}
         return {
             "ticker": ticker,
             "company_name": inst.name,
-            "sector": inst.sector,
-            "trailing_pe": round(180.0 / eps, 2) if eps > 0 else 24.5,
-            "ev_ebitda": 18.2,
-            "roe_pct": round((ni / (rev * 0.6)) * 100.0, 2),
-            "net_margin_pct": round((ni / rev) * 100.0, 2),
-            "debt_to_equity": 1.45,
-            "as_of": datetime.now(UTC).strftime("%Y-%m-%d"),
+            "ratios": ratios,
+            "trailing_pe": by_key.get("pe_ratio"),
+            "roe_pct": by_key.get("roe"),
+            "availability": "available" if ratios else "unavailable",
+            "reason": None if ratios else "Normalized financial statements unavailable.",
         }
 
     elif name == "get_prices":
         ticker = str(args.get("ticker", "")).upper().strip()
         days = int(args.get("days", 30))
-        inst = (await session.execute(select(Instrument).where(Instrument.ticker == ticker))).scalar_one_or_none()
+        inst = (
+            await session.execute(select(Instrument).where(Instrument.ticker == ticker))
+        ).scalar_one_or_none()
         if not inst:
             return {"error": f"Instrument '{ticker}' not found"}
 
         cutoff = datetime.now(UTC) - timedelta(days=days)
         bars = (
-            await session.execute(
-                select(PriceBar)
-                .where(PriceBar.instrument_id == inst.id, PriceBar.ts >= cutoff)
-                .order_by(PriceBar.ts)
+            (
+                await session.execute(
+                    select(PriceBar)
+                    .where(PriceBar.instrument_id == inst.id, PriceBar.ts >= cutoff)
+                    .order_by(PriceBar.ts)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         if not bars:
             return {"ticker": ticker, "bars_count": 0, "message": "No price bars found in window"}
@@ -182,7 +208,7 @@ async def execute_tool(
         }
 
     elif name == "run_screen":
-        pe_max = args.get("pe_max")
+        args.get("pe_max")
         sector = args.get("sector")
         stmt = select(Instrument).limit(10)
         if sector:
@@ -197,23 +223,25 @@ async def execute_tool(
         }
 
     elif name == "quick_dcf":
-        ticker = str(args.get("ticker", "")).upper().strip()
-        wacc = float(args.get("wacc", 0.09))
-        g = float(args.get("terminal_growth", 0.025))
-        base_fcf = 50_000_000_000.0  # baseline
-        # 5 year projection at 8%
-        pv_cf = sum((base_fcf * (1.08 ** yr)) / ((1 + wacc) ** yr) for yr in range(1, 6))
-        terminal_val = (base_fcf * (1.08 ** 5) * (1 + g)) / (wacc - g)
-        pv_tv = terminal_val / ((1 + wacc) ** 5)
-        implied_ev = pv_cf + pv_tv
-        return {
-            "ticker": ticker,
-            "wacc": wacc,
-            "terminal_growth": g,
-            "implied_enterprise_value": round(implied_ev, 2),
-            "implied_fair_share_price": round(implied_ev / 15_000_000_000, 2),
-            "methodology": "5-year FCFF projection with Gordon Growth terminal value",
-        }
+        required = (
+            "base_revenue",
+            "revenue_growth",
+            "ebit_margin",
+            "tax_rate",
+            "wacc",
+            "shares_outstanding",
+        )
+        if any(field not in args for field in required):
+            return {
+                "ticker": args.get("ticker"),
+                "implied_fair_share_price": None,
+                "availability": "unavailable",
+                "reason": "Supply sourced revenue and shares, tax rate and explicit forecast assumptions.",
+            }
+        from analystforge.api.services.valuation import execute_dcf
+
+        result = execute_dcf(args)
+        return {**result, "implied_fair_share_price": result["value_per_share"]}
 
     return {"error": f"Unknown tool '{name}'"}
 
@@ -233,7 +261,9 @@ def build_system_prompt(passages: list[dict[str, Any]]) -> str:
             f"Content: {p.get('content')}\n"
         )
 
-    evidence_block = "\n".join(passages_text) if passages_text else "(No retrieved passages available)"
+    evidence_block = (
+        "\n".join(passages_text) if passages_text else "(No retrieved passages available)"
+    )
 
     return (
         "You are AnalystForge's institutional research assistant.\n"
@@ -292,15 +322,17 @@ async def execute_research_assistant_query(
             for i, p in enumerate(passages, start=1)
         ]
         if not citations:
-            citations.append({
-                "citation_id": 1,
-                "source_type": "SYSTEM",
-                "title": "AnalystForge Canonical Market Knowledge Base",
-                "section": "System",
-                "snippet": f"Analyzed query '{query}' across indexed corporate disclosures.",
-                "score": 1.0,
-                "backend": "lexical-fallback",
-            })
+            citations.append(
+                {
+                    "citation_id": 1,
+                    "source_type": "SYSTEM",
+                    "title": "AnalystForge Canonical Market Knowledge Base",
+                    "section": "System",
+                    "snippet": f"Analyzed query '{query}' across indexed corporate disclosures.",
+                    "score": 1.0,
+                    "backend": "lexical-fallback",
+                }
+            )
         target_name = instrument.name if instrument else (ticker_clean or "Market Universe")
         answer_text = (
             f"### Research Synthesis for {target_name}\n\n"
@@ -318,7 +350,12 @@ async def execute_research_assistant_query(
             sess_check = (await session.execute(sess_stmt)).scalar_one_or_none()
             if sess_check:
                 u_msg = ResearchMessage(session_id=session_id, role="user", content=query)
-                a_msg = ResearchMessage(session_id=session_id, role="assistant", content=answer_text, citations=citations)
+                a_msg = ResearchMessage(
+                    session_id=session_id,
+                    role="assistant",
+                    content=answer_text,
+                    citations=citations,
+                )
                 session.add_all([u_msg, a_msg])
                 await session.commit()
 
@@ -378,7 +415,10 @@ async def execute_research_assistant_query(
     sys_prompt = build_system_prompt(passages)
     messages: list[ChatMessage] = [
         ChatMessage(role="system", content=sys_prompt),
-        ChatMessage(role="user", content=f"Analyst Question: {query}\nTicker Context: {ticker_clean or 'None'}"),
+        ChatMessage(
+            role="user",
+            content=f"Analyst Question: {query}\nTicker Context: {ticker_clean or 'None'}",
+        ),
     ]
 
     tool_calls_executed: list[dict[str, Any]] = []
@@ -400,12 +440,18 @@ async def execute_research_assistant_query(
     if response.tool_calls:
         for tc in response.tool_calls:
             tool_res = await execute_tool(tc.name, tc.arguments, session)
-            tool_calls_executed.append({"name": tc.name, "arguments": tc.arguments, "output": tool_res})
+            tool_calls_executed.append(
+                {"name": tc.name, "arguments": tc.arguments, "output": tool_res}
+            )
 
         # Append assistant message with tool calls and tool responses
-        messages.append(ChatMessage(role="assistant", content=response.content, tool_calls=response.tool_calls))
-        for tc, executed in zip(response.tool_calls, tool_calls_executed):
-            messages.append(ChatMessage(role="tool", content=json.dumps(executed["output"]), name=tc.name))
+        messages.append(
+            ChatMessage(role="assistant", content=response.content, tool_calls=response.tool_calls)
+        )
+        for tc, executed in zip(response.tool_calls, tool_calls_executed, strict=False):
+            messages.append(
+                ChatMessage(role="tool", content=json.dumps(executed["output"]), name=tc.name)
+            )
 
         # Re-complete with tool outputs
         try:
@@ -428,17 +474,18 @@ async def execute_research_assistant_query(
     citations = []
     if not is_refusal:
         for i, p in enumerate(passages, start=1):
-            cite_tag = f"[citation:{i}]"
             # Include citation if referenced or as top grounded passage
-            citations.append({
-                "citation_id": i,
-                "source_type": p.get("source_type"),
-                "title": p.get("title"),
-                "section": p.get("section"),
-                "snippet": p.get("snippet"),
-                "score": p.get("score"),
-                "backend": p.get("backend", backend),
-            })
+            citations.append(
+                {
+                    "citation_id": i,
+                    "source_type": p.get("source_type"),
+                    "title": p.get("title"),
+                    "section": p.get("section"),
+                    "snippet": p.get("snippet"),
+                    "score": p.get("score"),
+                    "backend": p.get("backend", backend),
+                }
+            )
 
     # 7. Audit log call
     latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -522,7 +569,10 @@ async def stream_research_assistant_query(
     sys_prompt = build_system_prompt(passages)
     messages: list[ChatMessage] = [
         ChatMessage(role="system", content=sys_prompt),
-        ChatMessage(role="user", content=f"Analyst Question: {query}\nTicker Context: {ticker_clean or 'None'}"),
+        ChatMessage(
+            role="user",
+            content=f"Analyst Question: {query}\nTicker Context: {ticker_clean or 'None'}",
+        ),
     ]
 
     citations = [
@@ -567,7 +617,12 @@ async def generate_research_note_draft(
     if not inst:
         return {"error": f"Instrument '{ticker_clean}' not found"}
 
-    passages, backend = await retrieve_relevant_passages(session, query=f"{ticker_clean} business financial performance risks", instrument_id=inst.id, limit=6)
+    passages, _backend = await retrieve_relevant_passages(
+        session,
+        query=f"{ticker_clean} business financial performance risks",
+        instrument_id=inst.id,
+        limit=6,
+    )
 
     llm = provider or get_llm_provider()
 
@@ -603,7 +658,9 @@ async def generate_research_note_draft(
         }
 
     try:
-        resp = await llm.complete(messages, response_format={"type": "json_object"}, temperature=0.1)
+        resp = await llm.complete(
+            messages, response_format={"type": "json_object"}, temperature=0.1
+        )
         data = json.loads(resp.content)
         data["ticker"] = ticker_clean
         data["company_name"] = inst.name

@@ -4,28 +4,89 @@ from __future__ import annotations
 
 import difflib
 import re
-from decimal import Decimal
 from typing import Any
 
 from analystforge.api.models.research import FundamentalFact
 
 # Standard SEC 10-K / 10-Q Item regex patterns
 SECTION_PATTERNS = [
-    ("item_1", "Item 1", "Business", re.compile(r"(?:ITEM\s+1\b[\.\:\s\-]+(?:BUSINESS|DESCRIPTION\s+OF\s+BUSINESS))", re.IGNORECASE)),
-    ("item_1a", "Item 1A", "Risk Factors", re.compile(r"(?:ITEM\s+1A\b[\.\:\s\-]+RISK\s+FACTORS)", re.IGNORECASE)),
-    ("item_1b", "Item 1B", "Unresolved Staff Comments", re.compile(r"(?:ITEM\s+1B\b[\.\:\s\-]+UNRESOLVED\s+STAFF\s+COMMENTS)", re.IGNORECASE)),
-    ("item_2", "Item 2", "Properties", re.compile(r"(?:ITEM\s+2\b[\.\:\s\-]+PROPERTIES)", re.IGNORECASE)),
-    ("item_3", "Item 3", "Legal Proceedings", re.compile(r"(?:ITEM\s+3\b[\.\:\s\-]+LEGAL\s+PROCEEDINGS)", re.IGNORECASE)),
-    ("item_7", "Item 7", "Management's Discussion and Analysis (MD&A)", re.compile(r"(?:ITEM\s+7\b[\.\:\s\-]+MANAGEMENT(?:\'S|\s+S)?\s+DISCUSSION\s+AND\s+ANALYSIS)", re.IGNORECASE)),
-    ("item_7a", "Item 7A", "Quantitative and Qualitative Disclosures About Market Risk", re.compile(r"(?:ITEM\s+7A\b[\.\:\s\-]+QUANTITATIVE\s+AND\s+QUALITATIVE\s+DISCLOSURES)", re.IGNORECASE)),
-    ("item_8", "Item 8", "Financial Statements and Supplementary Data", re.compile(r"(?:ITEM\s+8\b[\.\:\s\-]+FINANCIAL\s+STATEMENTS)", re.IGNORECASE)),
+    (
+        "item_1",
+        "Item 1",
+        "Business",
+        re.compile(
+            r"(?:ITEM\s+1\b[\.\:\s\-]+(?:BUSINESS|DESCRIPTION\s+OF\s+BUSINESS))", re.IGNORECASE
+        ),
+    ),
+    (
+        "item_1a",
+        "Item 1A",
+        "Risk Factors",
+        re.compile(r"(?:ITEM\s+1A\b[\.\:\s\-]+RISK\s+FACTORS)", re.IGNORECASE),
+    ),
+    (
+        "item_1b",
+        "Item 1B",
+        "Unresolved Staff Comments",
+        re.compile(r"(?:ITEM\s+1B\b[\.\:\s\-]+UNRESOLVED\s+STAFF\s+COMMENTS)", re.IGNORECASE),
+    ),
+    (
+        "item_2",
+        "Item 2",
+        "Properties",
+        re.compile(r"(?:ITEM\s+2\b[\.\:\s\-]+PROPERTIES)", re.IGNORECASE),
+    ),
+    (
+        "item_3",
+        "Item 3",
+        "Legal Proceedings",
+        re.compile(r"(?:ITEM\s+3\b[\.\:\s\-]+LEGAL\s+PROCEEDINGS)", re.IGNORECASE),
+    ),
+    (
+        "item_7",
+        "Item 7",
+        "Management's Discussion and Analysis (MD&A)",
+        re.compile(
+            r"(?:ITEM\s+7\b[\.\:\s\-]+MANAGEMENT(?:\'S|\s+S)?\s+DISCUSSION\s+AND\s+ANALYSIS)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "item_7a",
+        "Item 7A",
+        "Quantitative and Qualitative Disclosures About Market Risk",
+        re.compile(
+            r"(?:ITEM\s+7A\b[\.\:\s\-]+QUANTITATIVE\s+AND\s+QUALITATIVE\s+DISCLOSURES)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "item_8",
+        "Item 8",
+        "Financial Statements and Supplementary Data",
+        re.compile(r"(?:ITEM\s+8\b[\.\:\s\-]+FINANCIAL\s+STATEMENTS)", re.IGNORECASE),
+    ),
 ]
 
 RISK_KEYWORDS = [
-    "artificial intelligence", "generative ai", "tariffs", "trade restrictions",
-    "supply chain", "geopolitical", "inflation", "interest rates", "liquidity",
-    "cybersecurity", "data privacy", "sanctions", "climate change", "competition",
-    "antitrust", "regulatory scrutiny", "foreign exchange", "credit risk",
+    "artificial intelligence",
+    "generative ai",
+    "tariffs",
+    "trade restrictions",
+    "supply chain",
+    "geopolitical",
+    "inflation",
+    "interest rates",
+    "liquidity",
+    "cybersecurity",
+    "data privacy",
+    "sanctions",
+    "climate change",
+    "competition",
+    "antitrust",
+    "regulatory scrutiny",
+    "foreign exchange",
+    "credit risk",
 ]
 
 

@@ -9,13 +9,12 @@ Supports:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import asyncio
+import json
+import time
+from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-import json
-import re
-import time
 from typing import Any, Literal
 
 import httpx
@@ -88,7 +87,7 @@ class TokenBucket:
         self.last_refill = time.monotonic()
         self._lock = asyncio.Lock()
 
-    async def acquire(self, timeout: float = 30.0) -> float:
+    async def acquire(self, timeout: float = 30.0) -> float:  # noqa: ASYNC109 - existing timeout interface
         """Acquire a token, waiting if necessary up to timeout."""
         start_time = time.monotonic()
         async with self._lock:
@@ -117,8 +116,7 @@ class LLMProvider(ABC):
     name: str
 
     @abstractmethod
-    def is_configured(self) -> bool:
-        ...
+    def is_configured(self) -> bool: ...
 
     @abstractmethod
     async def complete(
@@ -130,8 +128,7 @@ class LLMProvider(ABC):
         max_tokens: int | None = None,
         response_format: dict[str, Any] | None = None,
         tools: list[dict[str, Any]] | None = None,
-    ) -> LLMResponse:
-        ...
+    ) -> LLMResponse: ...
 
     @abstractmethod
     async def stream(
@@ -141,20 +138,17 @@ class LLMProvider(ABC):
         model: str | None = None,
         temperature: float = 0.0,
         max_tokens: int | None = None,
-    ) -> AsyncIterator[str]:
-        ...
+    ) -> AsyncIterator[str]: ...
 
     @abstractmethod
-    async def check_reachability(self) -> tuple[bool, str | None]:
-        ...
+    async def check_reachability(self) -> tuple[bool, str | None]: ...
 
     @abstractmethod
-    async def resolve_model(self) -> str:
-        ...
+    async def resolve_model(self) -> str: ...
 
     async def aclose(self) -> None:
         """Cleanup resources."""
-        pass
+        return None
 
 
 class NoneLLMProvider(LLMProvider):
@@ -315,15 +309,27 @@ class OpenAICompatibleProvider(LLMProvider):
                     # Select first chat model matching common architectures
                     def is_chat_model(mid: str) -> bool:
                         mid_lower = mid.lower()
-                        if any(neg in mid_lower for neg in ("guard", "whisper", "embed", "moderation", "tts", "stt", "safeguard")):
+                        if any(
+                            neg in mid_lower
+                            for neg in (
+                                "guard",
+                                "whisper",
+                                "embed",
+                                "moderation",
+                                "tts",
+                                "stt",
+                                "safeguard",
+                            )
+                        ):
                             return False
-                        return any(pattern in mid_lower for pattern in ("llama", "qwen", "gpt", "mixtral", "allam", "gemma"))
+                        return any(
+                            pattern in mid_lower
+                            for pattern in ("llama", "qwen", "gpt", "mixtral", "allam", "gemma")
+                        )
 
-                    candidates = [
-                        mid for mid in available_ids
-                        if mid and is_chat_model(mid)
-                    ]
+                    candidates = [mid for mid in available_ids if mid and is_chat_model(mid)]
                     if candidates:
+
                         def sort_key(mid: str) -> tuple[int, str]:
                             m = mid.lower()
                             if "qwen" in m:
@@ -411,7 +417,11 @@ class OpenAICompatibleProvider(LLMProvider):
                 resp = await client.post("/chat/completions", json=payload)
                 if resp.status_code == 429:
                     retry_after_str = resp.headers.get("Retry-After")
-                    retry_after = float(retry_after_str) if retry_after_str and retry_after_str.isdigit() else (2.0 ** attempt)
+                    retry_after = (
+                        float(retry_after_str)
+                        if retry_after_str and retry_after_str.isdigit()
+                        else (2.0**attempt)
+                    )
                     if attempt == self.max_retries - 1:
                         raise LLMRateLimitError(
                             self.name,
@@ -436,7 +446,9 @@ class OpenAICompatibleProvider(LLMProvider):
                         fn_args = json.loads(fn.get("arguments", "{}"))
                     except json.JSONDecodeError:
                         fn_args = {"raw": fn.get("arguments")}
-                    tool_calls.append(ToolCall(id=tc.get("id", ""), name=fn_name, arguments=fn_args))
+                    tool_calls.append(
+                        ToolCall(id=tc.get("id", ""), name=fn_name, arguments=fn_args)
+                    )
 
                 usage = data.get("usage", {})
                 return LLMResponse(
@@ -451,9 +463,11 @@ class OpenAICompatibleProvider(LLMProvider):
                 raise
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == 429 and attempt < self.max_retries - 1:
-                    await asyncio.sleep(2.0 ** attempt)
+                    await asyncio.sleep(2.0**attempt)
                     continue
-                raise ProviderError(self.name, f"HTTP {exc.response.status_code}: {exc.response.text[:200]}") from exc
+                raise ProviderError(
+                    self.name, f"HTTP {exc.response.status_code}: {exc.response.text[:200]}"
+                ) from exc
             except Exception as exc:
                 if attempt == self.max_retries - 1:
                     raise ProviderError(self.name, str(exc)) from exc
@@ -492,7 +506,11 @@ class OpenAICompatibleProvider(LLMProvider):
             async with client.stream("POST", "/chat/completions", json=payload) as resp:
                 if resp.status_code == 429:
                     retry_after_str = resp.headers.get("Retry-After")
-                    retry_after = float(retry_after_str) if retry_after_str and retry_after_str.isdigit() else 5.0
+                    retry_after = (
+                        float(retry_after_str)
+                        if retry_after_str and retry_after_str.isdigit()
+                        else 5.0
+                    )
                     raise LLMRateLimitError(
                         self.name,
                         retry_after=retry_after,
@@ -515,7 +533,9 @@ class OpenAICompatibleProvider(LLMProvider):
                         except json.JSONDecodeError:
                             continue
         except httpx.HTTPStatusError as exc:
-            raise ProviderError(self.name, f"Streaming error HTTP {exc.response.status_code}") from exc
+            raise ProviderError(
+                self.name, f"Streaming error HTTP {exc.response.status_code}"
+            ) from exc
 
 
 class AnthropicProvider(LLMProvider):
@@ -587,10 +607,14 @@ class AnthropicProvider(LLMProvider):
             payload["system"] = system_prompt
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            resp = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages", headers=headers, json=payload
+            )
             resp.raise_for_status()
             data = resp.json()
-            text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+            text = "".join(
+                b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
+            )
             return LLMResponse(content=text, model=data.get("model", self.model))
 
     async def stream(
@@ -602,7 +626,9 @@ class AnthropicProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         # Basic streaming fallback
-        res = await self.complete(messages, model=model, temperature=temperature, max_tokens=max_tokens)
+        res = await self.complete(
+            messages, model=model, temperature=temperature, max_tokens=max_tokens
+        )
         yield res.content
 
 
@@ -611,7 +637,11 @@ class DeterministicFakeLLMProvider(LLMProvider):
 
     name = "fake"
 
-    def __init__(self, canned_response: str | dict[str, str] = "This is a deterministic AI response based on retrieved facts.") -> None:
+    def __init__(
+        self,
+        canned_response: str
+        | dict[str, str] = "This is a deterministic AI response based on retrieved facts.",
+    ) -> None:
         self.canned_response = canned_response
         self.call_history: list[list[dict[str, Any]]] = []
 
@@ -642,20 +672,25 @@ class DeterministicFakeLLMProvider(LLMProvider):
         all_text = " ".join(str(m.get("content", "")) for m in raw_msgs)
 
         if response_format and response_format.get("type") == "json_object":
-            content = json.dumps({
-                "snapshot": "Deterministic corporate snapshot based on indexed disclosures.",
-                "thesis": "Market leadership substantiated by robust cash generation.",
-                "risks": "Regulatory, supply chain, and macroeconomic interest rate shifts.",
-                "valuation_summary": "In line with sector trading multiples and DCF fair value estimates.",
-                "confidence": 0.95,
-            })
+            content = json.dumps(
+                {
+                    "snapshot": "Deterministic corporate snapshot based on indexed disclosures.",
+                    "thesis": "Market leadership substantiated by robust cash generation.",
+                    "risks": "Regulatory, supply chain, and macroeconomic interest rate shifts.",
+                    "valuation_summary": "In line with sector trading multiples and DCF fair value estimates.",
+                    "confidence": 0.95,
+                }
+            )
         elif isinstance(self.canned_response, dict):
             matched = None
             for k, v in self.canned_response.items():
                 if k.lower() in all_text.lower():
                     matched = v
                     break
-            content = matched or "[citation:1] Deterministic research synthesis based on retrieved disclosures."
+            content = (
+                matched
+                or "[citation:1] Deterministic research synthesis based on retrieved disclosures."
+            )
         else:
             content = str(self.canned_response)
 
@@ -664,7 +699,11 @@ class DeterministicFakeLLMProvider(LLMProvider):
             # If prompt asks for calculation or tool, return a fake tool call
             last_msg = str(raw_msgs[-1].get("content", ""))
             if "calculate" in last_msg.lower() or "dcf" in last_msg.lower():
-                tool_calls.append(ToolCall(id="call_fake_1", name="calculate_dcf", arguments={"growth_rate": 0.05}))
+                tool_calls.append(
+                    ToolCall(
+                        id="call_fake_1", name="calculate_dcf", arguments={"growth_rate": 0.05}
+                    )
+                )
 
         return LLMResponse(
             content=content,
@@ -684,7 +723,11 @@ class DeterministicFakeLLMProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         if isinstance(self.canned_response, dict):
-            text = list(self.canned_response.values())[0] if self.canned_response else "Deterministic response"
+            text = (
+                next(iter(self.canned_response.values()))
+                if self.canned_response
+                else "Deterministic response"
+            )
         else:
             text = str(self.canned_response)
         words = text.split(" ")

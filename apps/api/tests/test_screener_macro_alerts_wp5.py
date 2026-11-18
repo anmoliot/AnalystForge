@@ -14,21 +14,22 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, date, datetime, timedelta, timezone
-from decimal import Decimal
 import uuid
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import httpx
 import pytest
 from sqlalchemy import select
 
-from analystforge.api.config import Settings
 from analystforge.api.db import Database
-from analystforge.api.models.collaboration import AnalystNote, ShareLink, Watchlist, WatchlistItem
-from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
+from analystforge.api.models.collaboration import ShareLink
 from analystforge.api.models.market import Exchange, Instrument, PriceBar
 from analystforge.api.models.screener import AlertDelivery, AlertEvent, AlertRule, SavedScreen
-from analystforge.api.services.alerts import evaluate_alert_rules, run_scheduled_screens_and_dispatch
+from analystforge.api.services.alerts import (
+    evaluate_alert_rules,
+    run_scheduled_screens_and_dispatch,
+)
 
 
 class MockSmtpServer:
@@ -39,7 +40,9 @@ class MockSmtpServer:
         self.port: int = 0
         self.received_messages: list[str] = []
 
-    async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def _handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.write(b"220 localhost ESMTP MailCatcher\r\n")
         await writer.drain()
 
@@ -126,7 +129,15 @@ async def _seed_screener_market_data(db: Database) -> None:
     async with db.session() as session:
         ex = await session.get(Exchange, "NASDAQ")
         if not ex:
-            session.add(Exchange(code="NASDAQ", name="Nasdaq", country="US", timezone="America/New_York", currency="USD"))
+            session.add(
+                Exchange(
+                    code="NASDAQ",
+                    name="Nasdaq",
+                    country="US",
+                    timezone="America/New_York",
+                    currency="USD",
+                )
+            )
             await session.flush()
 
         tickers = [
@@ -135,9 +146,11 @@ async def _seed_screener_market_data(db: Database) -> None:
             ("JNJ", "Johnson & Johnson", "Healthcare", Decimal("155.00"), 500000),
             ("XOM", "Exxon Mobil Corp.", "Energy", Decimal("112.40"), 600000),
         ]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for t, name, sector, price, vol in tickers:
-            inst = (await session.execute(select(Instrument).where(Instrument.ticker == t))).scalar_one_or_none()
+            inst = (
+                await session.execute(select(Instrument).where(Instrument.ticker == t))
+            ).scalar_one_or_none()
             if not inst:
                 inst = Instrument(
                     id=uuid.uuid4(),
@@ -370,7 +383,9 @@ async def test_notes_and_comments_lifecycle(
     note_id = create_resp.json()["id"]
 
     # 2. List notes for MSFT
-    list_resp = await client.get("/api/v1/notes?entity_type=ticker&entity_id=MSFT", headers=auth_headers)
+    list_resp = await client.get(
+        "/api/v1/notes?entity_type=ticker&entity_id=MSFT", headers=auth_headers
+    )
     assert list_resp.status_code == 200
     notes = list_resp.json()
     assert any(n["id"] == note_id for n in notes)
@@ -415,7 +430,7 @@ async def test_expiring_share_links_lifecycle(
     async with db.session() as session:
         link = await session.get(ShareLink, uuid.UUID(share_id))
         assert link is not None
-        link.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        link.expires_at = datetime.now(UTC) - timedelta(hours=1)
         await session.commit()
 
     # Accessing expired link returns HTTP 410 Gone

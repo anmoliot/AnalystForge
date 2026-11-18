@@ -12,7 +12,7 @@ from analystforge.api.models.collaboration import (
     Watchlist,
     WatchlistItem,
 )
-from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, TOTPSecret, Tenant, User
+from analystforge.api.models.core import ApiKey, AuditLog, RefreshToken, Tenant, TOTPSecret, User
 from analystforge.api.models.macro import FxRate, MacroObservation, MacroSeries
 from analystforge.api.models.market import (
     CorporateAction,
@@ -76,4 +76,3 @@ __all__ = [
     "Watchlist",
     "WatchlistItem",
 ]
-

@@ -111,7 +111,7 @@ def compute_bm25_lexical_scores(query: str, documents: list[str]) -> list[float]
     b = 0.75
 
     scores = []
-    for dt, dl in zip(doc_tokens, doc_lens):
+    for dt, dl in zip(doc_tokens, doc_lens, strict=False):
         tf = Counter(dt)
         score = 0.0
         for q in q_tokens:
@@ -119,7 +119,9 @@ def compute_bm25_lexical_scores(query: str, documents: list[str]) -> list[float]
                 doc_freq = df[q]
                 idf = math.log(1.0 + (num_docs - doc_freq + 0.5) / (doc_freq + 0.5))
                 term_tf = tf[q]
-                norm_tf = (term_tf * (k1 + 1)) / (term_tf + k1 * (1 - b + b * (dl / max(1.0, avg_dl))))
+                norm_tf = (term_tf * (k1 + 1)) / (
+                    term_tf + k1 * (1 - b + b * (dl / max(1.0, avg_dl)))
+                )
                 score += idf * norm_tf
         # Boost exact phrase match
         if query.lower() in " ".join(dt):
@@ -150,9 +152,9 @@ def compute_semantic_scores(query: str, documents: list[str]) -> tuple[list[floa
             logger.warning("sentence_transformers.inference_failed", error=str(exc))
 
     # Deterministic lexical vector fallback (TF-IDF cosine similarity)
-    all_docs = [query] + documents
+    all_docs = [query, *documents]
     doc_tokens = [tokenize(d) for d in all_docs]
-    vocab = sorted(list(set(w for dt in doc_tokens for w in dt)))
+    vocab = sorted({w for dt in doc_tokens for w in dt})
     if not vocab:
         return [0.0] * len(documents), "lexical-fallback"
 
@@ -179,7 +181,7 @@ def compute_semantic_scores(query: str, documents: list[str]) -> tuple[list[floa
     doc_vecs = vectors[1:]
     scores = []
     for d_vec in doc_vecs:
-        sim = sum(q * d for q, d in zip(q_vec, d_vec))
+        sim = sum(q * d for q, d in zip(q_vec, d_vec, strict=False))
         scores.append(round(max(0.0, sim), 4))
 
     return scores, "lexical-fallback"
@@ -231,15 +233,17 @@ async def retrieve_relevant_passages(
     db_chunks = (await session.execute(chunk_stmt)).scalars().all()
 
     for c in db_chunks:
-        passages.append({
-            "source_type": c.source_type,
-            "source_id": c.source_id,
-            "title": c.title,
-            "section": c.section,
-            "content": c.content,
-            "snippet": c.content[:300] + ("..." if len(c.content) > 300 else ""),
-            "chunk_index": c.chunk_index,
-        })
+        passages.append(
+            {
+                "source_type": c.source_type,
+                "source_id": c.source_id,
+                "title": c.title,
+                "section": c.section,
+                "content": c.content,
+                "snippet": c.content[:300] + ("..." if len(c.content) > 300 else ""),
+                "chunk_index": c.chunk_index,
+            }
+        )
 
     # 2. If instrument specified and passages sparse, extract from Filing, Facts, and News
     if instrument_id and len(passages) < 5:
@@ -252,15 +256,17 @@ async def retrieve_relevant_passages(
         )
         filings = (await session.execute(filing_stmt)).scalars().all()
         for f in filings:
-            passages.append({
-                "source_type": "FILING",
-                "source_id": f.accession,
-                "title": f"{f.form} Regulatory Filing (Accession {f.accession})",
-                "section": f"Filing Date {f.filed_date.isoformat()}",
-                "content": f"Filing {f.form} filed on {f.filed_date} for period {f.period_of_report}. Primary document: {f.primary_document}. Document URL: {f.document_url}.",
-                "snippet": f"SEC {f.form} filing for period {f.period_of_report} filed on {f.filed_date}.",
-                "chunk_index": 0,
-            })
+            passages.append(
+                {
+                    "source_type": "FILING",
+                    "source_id": f.accession,
+                    "title": f"{f.form} Regulatory Filing (Accession {f.accession})",
+                    "section": f"Filing Date {f.filed_date.isoformat()}",
+                    "content": f"Filing {f.form} filed on {f.filed_date} for period {f.period_of_report}. Primary document: {f.primary_document}. Document URL: {f.document_url}.",
+                    "snippet": f"SEC {f.form} filing for period {f.period_of_report} filed on {f.filed_date}.",
+                    "chunk_index": 0,
+                }
+            )
 
         # B. Facts
         fact_stmt = (
@@ -271,15 +277,17 @@ async def retrieve_relevant_passages(
         )
         facts = (await session.execute(fact_stmt)).scalars().all()
         for fact in facts:
-            passages.append({
-                "source_type": "FACT",
-                "source_id": f"{fact.concept}_{fact.period_end}",
-                "title": f"XBRL Fact: {fact.concept}",
-                "section": f"Period Ending {fact.period_end}",
-                "content": f"XBRL concept {fact.concept} value {fact.value} {fact.unit} for period {fact.period_start} to {fact.period_end} (Form {fact.form}).",
-                "snippet": f"{fact.concept}: {fact.value} {fact.unit} (ending {fact.period_end})",
-                "chunk_index": 0,
-            })
+            passages.append(
+                {
+                    "source_type": "FACT",
+                    "source_id": f"{fact.concept}_{fact.period_end}",
+                    "title": f"XBRL Fact: {fact.concept}",
+                    "section": f"Period Ending {fact.period_end}",
+                    "content": f"XBRL concept {fact.concept} value {fact.value} {fact.unit} for period {fact.period_start} to {fact.period_end} (Form {fact.form}).",
+                    "snippet": f"{fact.concept}: {fact.value} {fact.unit} (ending {fact.period_end})",
+                    "chunk_index": 0,
+                }
+            )
 
         # C. News
         news_stmt = (
@@ -291,15 +299,17 @@ async def retrieve_relevant_passages(
         )
         articles = (await session.execute(news_stmt)).scalars().all()
         for a in articles:
-            passages.append({
-                "source_type": "NEWS",
-                "source_id": str(a.id),
-                "title": a.title,
-                "section": "Market News",
-                "content": f"{a.title}. {a.summary or ''} {a.content or ''}".strip(),
-                "snippet": a.summary or a.title,
-                "chunk_index": 0,
-            })
+            passages.append(
+                {
+                    "source_type": "NEWS",
+                    "source_id": str(a.id),
+                    "title": a.title,
+                    "section": "Market News",
+                    "content": f"{a.title}. {a.summary or ''} {a.content or ''}".strip(),
+                    "snippet": a.summary or a.title,
+                    "chunk_index": 0,
+                }
+            )
 
     if not passages:
         return [], get_embedding_backend()

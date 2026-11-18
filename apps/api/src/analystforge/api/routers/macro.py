@@ -9,7 +9,7 @@ Real FRED data only:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -53,54 +53,79 @@ async def get_macro_indicators(session: SessionDep, request: Request) -> list[di
 
         latest_val = float(obs_rows[0][1]) if obs_rows and obs_rows[0][1] is not None else None
         latest_date = obs_rows[0][0].isoformat() if obs_rows else None
-        prior_val = float(obs_rows[1][1]) if len(obs_rows) > 1 and obs_rows[1][1] is not None else latest_val
+        prior_val = (
+            float(obs_rows[1][1])
+            if len(obs_rows) > 1 and obs_rows[1][1] is not None
+            else latest_val
+        )
         change = latest_val - prior_val if latest_val is not None and prior_val is not None else 0.0
 
-        results.append({
-            "code": s.code,
-            "id": s.code,
-            "title": s.title,
-            "units": s.units,
-            "frequency": s.frequency,
-            "provider": s.provider or "FRED",
-            "latest_value": latest_val,
-            "latest_date": latest_date,
-            "as_of": latest_date,
-            "change": round(change, 4),
-            "history": [
-                {"date": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
-                for r in reversed(obs_rows)
-            ],
-        })
+        results.append(
+            {
+                "code": s.code,
+                "id": s.code,
+                "title": s.title,
+                "units": s.units,
+                "frequency": s.frequency,
+                "provider": s.provider or "FRED",
+                "latest_value": latest_val,
+                "latest_date": latest_date,
+                "as_of": latest_date,
+                "change": round(change, 4),
+                "history": [
+                    {"date": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
+                    for r in reversed(obs_rows)
+                ],
+            }
+        )
 
     # Return empty list if no series ingested, unless explicit DEMO mode is enabled
     if not results and demo_mode:
-        today = date.today()
+        today = datetime.now(UTC).date()
         standard_demo = [
             ("DGS10", "10-Year Treasury Constant Maturity Rate [DEMO]", "%", "Daily", 4.35, -0.04),
             ("DGS2", "2-Year Treasury Constant Maturity Rate [DEMO]", "%", "Daily", 4.22, -0.06),
             ("FEDFUNDS", "Federal Funds Effective Rate [DEMO]", "%", "Monthly", 4.83, 0.0),
-            ("CPIAUCSL", "Consumer Price Index (CPI All Urban) [DEMO]", "Index", "Monthly", 315.2, 0.8),
+            (
+                "CPIAUCSL",
+                "Consumer Price Index (CPI All Urban) [DEMO]",
+                "Index",
+                "Monthly",
+                315.2,
+                0.8,
+            ),
             ("UNRATE", "Civilian Unemployment Rate [DEMO]", "%", "Monthly", 4.1, 0.0),
-            ("GDPC1", "Real Gross Domestic Product [DEMO]", "Bil. Chn. 2017 $", "Quarterly", 22850.0, 70.0),
+            (
+                "GDPC1",
+                "Real Gross Domestic Product [DEMO]",
+                "Bil. Chn. 2017 $",
+                "Quarterly",
+                22850.0,
+                70.0,
+            ),
         ]
         for s_id, title, units, freq, val, chg in standard_demo:
-            results.append({
-                "code": s_id,
-                "id": s_id,
-                "title": title,
-                "units": units,
-                "frequency": freq,
-                "provider": "DEMO",
-                "latest_value": val,
-                "latest_date": today.isoformat(),
-                "as_of": today.isoformat(),
-                "change": chg,
-                "history": [
-                    {"date": (today - timedelta(days=i * 7)).isoformat(), "value": round(val - (i * chg * 0.2), 3)}
-                    for i in reversed(range(12))
-                ],
-            })
+            results.append(
+                {
+                    "code": s_id,
+                    "id": s_id,
+                    "title": title,
+                    "units": units,
+                    "frequency": freq,
+                    "provider": "DEMO",
+                    "latest_value": val,
+                    "latest_date": today.isoformat(),
+                    "as_of": today.isoformat(),
+                    "change": chg,
+                    "history": [
+                        {
+                            "date": (today - timedelta(days=i * 7)).isoformat(),
+                            "value": round(val - (i * chg * 0.2), 3),
+                        }
+                        for i in reversed(range(12))
+                    ],
+                }
+            )
 
     return results
 
@@ -133,7 +158,9 @@ async def get_series_detail(code: str, session: SessionDep) -> dict[str, Any]:
     }
 
 
-@router.get("/yield-curve", summary="US Treasury yield curve structure, historical comparisons, and slope")
+@router.get(
+    "/yield-curve", summary="US Treasury yield curve structure, historical comparisons, and slope"
+)
 async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, Any]:
     settings = getattr(request.app.state, "settings", None)
     fred_configured = bool(settings.provider_key("fred")) if settings else False
@@ -172,7 +199,9 @@ async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, An
             )
             row_1m = (await session.execute(stmt_1m)).first()
             if row_1m and row_1m[1] is not None:
-                curve_1m_ago.append({"tenor": tenor, "rate": float(row_1m[1]), "as_of": row_1m[0].isoformat()})
+                curve_1m_ago.append(
+                    {"tenor": tenor, "rate": float(row_1m[1]), "as_of": row_1m[0].isoformat()}
+                )
 
             # Historical 1 Year Ago (~365 days prior)
             target_1y = obs_day - timedelta(days=365)
@@ -184,7 +213,9 @@ async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, An
             )
             row_1y = (await session.execute(stmt_1y)).first()
             if row_1y and row_1y[1] is not None:
-                curve_1y_ago.append({"tenor": tenor, "rate": float(row_1y[1]), "as_of": row_1y[0].isoformat()})
+                curve_1y_ago.append(
+                    {"tenor": tenor, "rate": float(row_1y[1]), "as_of": row_1y[0].isoformat()}
+                )
 
     if curve_tenors:
         rate_10y = rate_map.get("DGS10")
@@ -208,7 +239,7 @@ async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, An
 
     # If demo mode is explicitly enabled, return labeled demo data
     if demo_mode:
-        today = date.today()
+        today = datetime.now(UTC).date()
         demo_curve = [
             {"tenor": "1M", "rate": 4.60, "as_of": today.isoformat()},
             {"tenor": "3M", "rate": 4.55, "as_of": today.isoformat()},
@@ -232,7 +263,11 @@ async def get_yield_curve(session: SessionDep, request: Request) -> dict[str, An
         }
 
     # Honest empty state: no fabricated numbers!
-    msg = "FRED key not configured" if not fred_configured else "FRED yield curve data not yet ingested"
+    msg = (
+        "FRED key not configured"
+        if not fred_configured
+        else "FRED yield curve data not yet ingested"
+    )
     return {
         "configured": fred_configured,
         "message": msg,
@@ -250,11 +285,7 @@ async def get_fx_rates(session: SessionDep, request: Request) -> list[dict[str, 
     settings = getattr(request.app.state, "settings", None)
     demo_mode = getattr(settings, "demo_mode", False) if settings else False
 
-    fx_stmt = (
-        select(FxRate)
-        .order_by(desc(FxRate.day))
-        .limit(100)
-    )
+    fx_stmt = select(FxRate).order_by(desc(FxRate.day)).limit(100)
     fx_rows = (await session.execute(fx_stmt)).scalars().all()
 
     rates: dict[str, Any] = {}
@@ -284,7 +315,7 @@ async def get_fx_rates(session: SessionDep, request: Request) -> list[dict[str, 
                 "base": base,
                 "quote": quote,
                 "rate": rate,
-                "date": date.today().isoformat(),
+                "date": datetime.now(UTC).date().isoformat(),
             }
 
     return list(rates.values())

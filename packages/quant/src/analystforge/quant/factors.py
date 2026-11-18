@@ -12,8 +12,8 @@ t-statistics, p-values, R-squared, and adjusted R-squared.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -82,7 +82,7 @@ def fama_french_regression(
         factor_cols = (
             [str(col) for col in factors.columns]
             if isinstance(factors, pd.DataFrame)
-            else [f"factor_{i+1}" for i in range(x_raw.shape[1])]
+            else [f"factor_{i + 1}" for i in range(x_raw.shape[1])]
         )
 
     n_obs = len(y_raw)
@@ -95,30 +95,32 @@ def fama_french_regression(
         )
 
     # Check finite
-    if not (np.all(np.isfinite(y_raw)) and np.all(np.isfinite(x_raw)) and np.all(np.isfinite(rf_vec))):
+    if not (
+        np.all(np.isfinite(y_raw)) and np.all(np.isfinite(x_raw)) and np.all(np.isfinite(rf_vec))
+    ):
         raise ValueError("Returns, factors, and risk-free series must contain only finite numbers.")
 
     # Excess return: Y = R_p - R_f
     # Note: If Mkt-RF is one of the factors, factors usually already represent excess returns
     y = y_raw - rf_vec
 
-    # Design matrix X with intercept column
+    # Design matrix x with intercept column
     # Intercept is in column 0: [1, X_1, X_2, ...]
-    X = np.column_stack([np.ones(n_obs), x_raw])
-    k = X.shape[1]  # n_factors + 1 (intercept)
+    x = np.column_stack([np.ones(n_obs), x_raw])
+    k = x.shape[1]  # n_factors + 1 (intercept)
     df_resid = n_obs - k
 
     if df_resid <= 0:
         raise ValueError("Degrees of freedom must be positive.")
 
-    # OLS estimation: beta = (X'X)^(-1) X'Y
+    # OLS estimation: beta = (x'x)^(-1) x'Y
     try:
         # Using lstsq or solve with pseudo-inverse for numerical stability
-        coeffs, residuals_sum, rank, s = np.linalg.lstsq(X, y, rcond=None)
+        coeffs, _residuals_sum, _rank, _s = np.linalg.lstsq(x, y, rcond=None)
     except np.linalg.LinAlgError as exc:
         raise ValueError(f"Linear regression failed: {exc}") from exc
 
-    y_pred = X @ coeffs
+    y_pred = x @ coeffs
     residuals = y - y_pred
     sse = float(np.sum(residuals**2))  # Sum of squared residuals
     sst = float(np.sum((y - np.mean(y)) ** 2))  # Total sum of squares
@@ -131,11 +133,11 @@ def fama_french_regression(
         # Adjusted R^2 = 1 - (1 - R^2) * (n - 1) / (n - k)
         r_squared_adj = float(1.0 - (1.0 - r_squared) * (n_obs - 1) / df_resid)
 
-    # Variance-covariance matrix of coefficients: s^2 * (X'X)^(-1)
+    # Variance-covariance matrix of coefficients: s^2 * (x'x)^(-1)
     mse = sse / df_resid
     try:
-        XtX_inv = np.linalg.pinv(X.T @ X)
-        var_coeffs = mse * np.diag(XtX_inv)
+        xtx_inv = np.linalg.pinv(x.T @ x)
+        var_coeffs = mse * np.diag(xtx_inv)
         std_errors = np.sqrt(np.maximum(var_coeffs, 1e-16))
     except Exception:
         std_errors = np.full(k, 1e-8)

@@ -5,12 +5,11 @@ from __future__ import annotations
 import csv
 import io
 import uuid
-from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select
 
 from analystforge.api.deps import CurrentUser, SessionDep
 from analystforge.api.errors import NotFoundError
@@ -40,6 +39,7 @@ class ScreenFilterRequest(BaseModel):
     max_price: float | None = None
     min_market_cap: float | None = None
     max_market_cap: float | None = None
+    min_pe: float | None = None
     max_pe: float | None = None
     min_roe: float | None = None
     search: str | None = None
@@ -148,7 +148,7 @@ async def _execute_screener_query(
             continue
 
         price = float(latest_bar.close)
-        volume = float(latest_bar.volume) if latest_bar.volume is not None else 0.0
+        volume = float(latest_bar.volume) if latest_bar.volume is not None else None
 
         # Retrieve fundamental facts (Net Income, Equity, Shares) if available
         facts_stmt = (
@@ -162,13 +162,13 @@ async def _execute_screener_query(
             if concept not in fact_dict and val is not None:
                 fact_dict[concept] = float(val)
 
-        shares_out = fact_dict.get("CommonStockSharesOutstanding") or 100_000_000.0
-        mkt_cap = price * shares_out
-        net_income = fact_dict.get("NetIncomeLoss") or (fact_dict.get("OperatingIncomeLoss", 0.0) * 0.75)
+        shares_out = fact_dict.get("CommonStockSharesOutstanding")
+        mkt_cap = price * shares_out if shares_out is not None else None
+        net_income = fact_dict.get("NetIncomeLoss")
         stockholders_equity = fact_dict.get("StockholdersEquity")
 
         pe_ratio: float | None = None
-        if net_income and net_income > 0:
+        if mkt_cap is not None and net_income and net_income > 0:
             pe_ratio = round(mkt_cap / net_income, 2)
 
         roe_pct: float | None = None
@@ -180,9 +180,15 @@ async def _execute_screener_query(
             continue
         if payload.max_price is not None and price > payload.max_price:
             continue
-        if payload.min_market_cap is not None and mkt_cap < payload.min_market_cap:
+        if payload.min_market_cap is not None and (
+            mkt_cap is None or mkt_cap < payload.min_market_cap
+        ):
             continue
-        if payload.max_market_cap is not None and mkt_cap > payload.max_market_cap:
+        if payload.max_market_cap is not None and (
+            mkt_cap is None or mkt_cap > payload.max_market_cap
+        ):
+            continue
+        if payload.min_pe is not None and (pe_ratio is None or pe_ratio < payload.min_pe):
             continue
         if payload.max_pe is not None and (pe_ratio is None or pe_ratio > payload.max_pe):
             continue
@@ -206,14 +212,17 @@ async def _execute_screener_query(
         }
 
         # AND/OR rule group evaluation
-        if payload.group is not None:
-            if not _evaluate_group_match(item, payload.group):
-                continue
+        if payload.group is not None and not _evaluate_group_match(item, payload.group):
+            continue
 
         results.append(item)
 
     reverse = payload.sort_dir.lower() == "desc"
-    key = payload.sort_by if payload.sort_by in ["ticker", "price", "market_cap", "pe_ratio", "roe", "volume"] else "ticker"
+    key = (
+        payload.sort_by
+        if payload.sort_by in ["ticker", "price", "market_cap", "pe_ratio", "roe", "volume"]
+        else "ticker"
+    )
     results.sort(key=lambda x: (x.get(key) is None, x.get(key)), reverse=reverse)
 
     return results
@@ -257,6 +266,7 @@ async def export_screen_results(
 
     if format == "json":
         import json
+
         return Response(
             content=json.dumps(items, indent=2),
             media_type="application/json",
@@ -266,18 +276,37 @@ async def export_screen_results(
     # CSV output
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "Ticker", "Company Name", "Exchange", "Sector", "Industry",
-        "Price", "Market Cap", "P/E Ratio", "ROE", "Volume", "As-Of Date"
-    ])
+    writer.writerow(
+        [
+            "Ticker",
+            "Company Name",
+            "Exchange",
+            "Sector",
+            "Industry",
+            "Price",
+            "Market Cap",
+            "P/E Ratio",
+            "ROE",
+            "Volume",
+            "As-Of Date",
+        ]
+    )
     for it in items:
-        writer.writerow([
-            it["ticker"], it["name"], it["exchange"], it.get("sector") or "", it.get("industry") or "",
-            f"{it['price']:.2f}", f"{it['market_cap']:.0f}",
-            f"{it['pe_ratio']:.2f}" if it["pe_ratio"] is not None else "",
-            f"{it['roe']:.4f}" if it["roe"] is not None else "",
-            f"{it['volume']:.0f}", it["as_of"],
-        ])
+        writer.writerow(
+            [
+                it["ticker"],
+                it["name"],
+                it["exchange"],
+                it.get("sector") or "",
+                it.get("industry") or "",
+                f"{it['price']:.2f}",
+                f"{it['market_cap']:.0f}" if it["market_cap"] is not None else "",
+                f"{it['pe_ratio']:.2f}" if it["pe_ratio"] is not None else "",
+                f"{it['roe']:.4f}" if it["roe"] is not None else "",
+                f"{it['volume']:.0f}" if it["volume"] is not None else "",
+                it["as_of"],
+            ]
+        )
 
     return Response(
         content=output.getvalue(),
@@ -356,7 +385,10 @@ async def run_saved_screen(
     return await _execute_screener_query(session, req)
 
 
-@router.post("/saved/{screen_id}/schedule", summary="Configure automated schedule and email alert for saved screen")
+@router.post(
+    "/saved/{screen_id}/schedule",
+    summary="Configure automated schedule and email alert for saved screen",
+)
 async def schedule_saved_screen(
     screen_id: uuid.UUID,
     payload: ScheduleScreenRequest,

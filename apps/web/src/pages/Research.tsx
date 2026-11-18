@@ -163,10 +163,10 @@ export default function Research() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-brand-400" />
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Grounded Research Assistant</h1>
+            <Sparkles className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Grounded Research Assistant</h1>
           </div>
-          <p className="mt-1 text-sm text-neutral-400">
+          <p className="mt-1 text-sm text-muted">
             SEC EDGAR filings, XBRL disclosures, and market news indexed with strict passage citation provenance.
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function Research() {
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             placeholder="TICKER"
-            className="w-24 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-center font-mono text-sm font-semibold text-brand-400 uppercase focus:border-brand-500 focus:outline-none"
+            className="w-24 rounded-md border border-neutral-700 bg-elevated px-3 py-1.5 text-center font-mono text-sm font-semibold text-accent uppercase focus:border-brand-500 focus:outline-none"
             data-testid="research-ticker-input"
           />
           <Button
@@ -196,12 +196,12 @@ export default function Research() {
         <div className="space-y-4">
           <Panel className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Workspaces ({sessions.length})
               </span>
             </div>
             {sessions.length === 0 ? (
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted">
                 No saved workspaces. Click &quot;New Workspace&quot; to persist your research history.
               </p>
             ) : (
@@ -212,13 +212,13 @@ export default function Research() {
                     onClick={() => handleSelectSession(s.id)}
                     className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs transition ${
                       currentSessionId === s.id
-                        ? "bg-brand-500/10 text-brand-400 border border-brand-500/30"
-                        : "text-neutral-300 hover:bg-neutral-800"
+                        ? "bg-brand-500/10 text-accent border border-brand-500/30"
+                        : "text-ink hover:bg-elevated"
                     }`}
                   >
                     <span className="truncate">{s.title}</span>
                     {s.ticker && (
-                      <span className="ml-1 rounded bg-neutral-800 px-1 py-0.5 font-mono text-[10px]">
+                      <span className="ml-1 rounded bg-elevated px-1 py-0.5 font-mono text-[10px]">
                         {s.ticker}
                       </span>
                     )}
@@ -230,7 +230,7 @@ export default function Research() {
 
           {/* Quick Prompts */}
           <Panel className="p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               Suggested Questions
             </span>
             <div className="mt-3 space-y-2">
@@ -238,7 +238,7 @@ export default function Research() {
                 <button
                   key={idx}
                   onClick={() => setQueryInput(q)}
-                  className="block w-full rounded border border-neutral-800 bg-neutral-900/60 p-2 text-left text-xs text-neutral-300 transition hover:border-neutral-700 hover:text-white"
+                  className="block w-full rounded border border-neutral-800 bg-elevated/60 p-2 text-left text-xs text-ink transition hover:border-neutral-700 hover:text-ink"
                 >
                   {q}
                 </button>
@@ -260,8 +260,8 @@ export default function Research() {
                 <div
                   className={`max-w-[85%] rounded-lg p-4 text-sm leading-relaxed ${
                     m.role === "user"
-                      ? "bg-brand-600 text-white"
-                      : "border border-neutral-800 bg-neutral-900/90 text-neutral-200"
+                      ? "bg-brand-600 text-ink"
+                      : "border border-neutral-800 bg-elevated/90 text-ink"
                   }`}
                 >
                   <div className="whitespace-pre-wrap">{m.content}</div>
@@ -269,7 +269,7 @@ export default function Research() {
                   {/* Citations Card */}
                   {m.citations && m.citations.length > 0 && (
                     <div className="mt-4 border-t border-neutral-800 pt-3">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-400 mb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent mb-2">
                         <BookOpen className="h-3.5 w-3.5" />
                         Grounded Citations & Provenance ({m.citations.length})
                       </div>
@@ -277,26 +277,26 @@ export default function Research() {
                         {m.citations.map((c, i) => (
                           <div
                             key={i}
-                            className="rounded border border-neutral-800 bg-neutral-950/70 p-2 text-xs"
+                            className="rounded border border-neutral-800 bg-panel/70 p-2 text-xs"
                           >
                             <div className="flex items-center justify-between">
                               <Badge tone="neutral" className="text-[10px]">
                                 {c.source_type}
                               </Badge>
                               {c.period && (
-                                <span className="text-[10px] text-neutral-400">{c.period}</span>
+                                <span className="text-[10px] text-muted">{c.period}</span>
                               )}
                             </div>
-                            <p className="mt-1 font-medium text-white line-clamp-1">{c.title}</p>
+                            <p className="mt-1 font-medium text-ink line-clamp-1">{c.title}</p>
                             {c.snippet && (
-                              <p className="mt-1 text-neutral-400 line-clamp-2">{c.snippet}</p>
+                              <p className="mt-1 text-muted line-clamp-2">{c.snippet}</p>
                             )}
                             {c.url && (
                               <a
                                 href={c.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-brand-400 hover:underline"
+                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-accent hover:underline"
                               >
                                 View Source <ExternalLink className="h-2.5 w-2.5" />
                               </a>
@@ -310,8 +310,8 @@ export default function Research() {
               </div>
             ))}
             {queryMutation.isPending && (
-              <div className="flex items-center gap-2 text-xs text-neutral-400">
-                <Sparkles className="h-4 w-4 animate-spin text-brand-400" />
+              <div className="flex items-center gap-2 text-xs text-muted">
+                <Sparkles className="h-4 w-4 animate-spin text-accent" />
                 Synthesizing grounded analysis from indexed filings and disclosures...
               </div>
             )}
@@ -326,7 +326,7 @@ export default function Research() {
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                className="flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-sm text-neutral-100 placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
+                className="flex-1 rounded-md border border-neutral-700 bg-elevated px-4 py-2.5 text-sm text-ink placeholder-neutral-500 focus:border-brand-500 focus:outline-none"
                 data-testid="research-query-input"
               />
               <Button

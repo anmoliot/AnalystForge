@@ -9,11 +9,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import jwt
 import pyotp
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-import jwt
-from jwt.exceptions import PyJWTError
 
 from analystforge.api.config import Settings
 
@@ -66,9 +65,7 @@ def create_access_token(
 
 
 def decode_access_token(token: str, settings: Settings) -> dict[str, Any]:
-    return dict(
-        jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[ALGORITHM])
-    )
+    return dict(jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[ALGORITHM]))
 
 
 def create_refresh_token() -> str:

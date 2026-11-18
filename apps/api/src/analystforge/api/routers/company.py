@@ -6,11 +6,11 @@ import uuid
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import desc, select
 
-from analystforge.api.deps import CurrentUser, SessionDep
+from analystforge.api.deps import SessionDep
 from analystforge.api.errors import NotFoundError
 from analystforge.api.models.research import Filing
 from analystforge.api.services.company import (
@@ -140,7 +140,9 @@ async def get_company(
         industry=overview.industry,
         description=overview.description,
         latest_price=float(overview.latest_price) if overview.latest_price is not None else None,
-        latest_price_date=overview.latest_price_date.isoformat() if overview.latest_price_date else None,
+        latest_price_date=overview.latest_price_date.isoformat()
+        if overview.latest_price_date
+        else None,
         change_pct=overview.change_pct,
         high_52w=float(overview.high_52w) if overview.high_52w is not None else None,
         low_52w=float(overview.low_52w) if overview.low_52w is not None else None,

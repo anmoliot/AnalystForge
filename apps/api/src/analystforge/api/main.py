@@ -9,19 +9,21 @@ from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analystforge.api import __version__
+from analystforge.api.audit import AuditMiddleware
 from analystforge.api.config import Settings, get_settings
 from analystforge.api.db import Database
-from analystforge.api.errors import AppError, error_body
+from analystforge.api.errors import AppError, RateLimitError, error_body
 from analystforge.api.health import router as ops_router
 from analystforge.api.logging import configure_logging
 from analystforge.api.middleware import RequestContextMiddleware, ResponseHeadersMiddleware
+from analystforge.api.rate_limit import RateLimiter, enforce_rate_limit
 from analystforge.api.routers import api_router
 from analystforge.api.services.runtime import build_app_registry
 
@@ -95,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if settings.redis_url
             else None
         )
+        app.state.rate_limiter = RateLimiter(app.state.redis)
         app.state.provider_registry = build_app_registry(settings, app.state.redis)
         logger.info(
             "app.started",
@@ -132,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         debug=settings.debug,
     )
 
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(ResponseHeadersMiddleware)
     app.add_middleware(
@@ -140,7 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
-        expose_headers=["X-Request-ID", "ETag"],
+        expose_headers=["X-Request-ID", "ETag", "Retry-After"],
     )
 
     _setup_observability(app, settings)
@@ -152,6 +156,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
+            headers={"Retry-After": str(exc.retry_after)}
+            if isinstance(exc, RateLimitError)
+            else None,
             content=error_body(
                 exc.code, exc.message, details=exc.details, request_id=request_id_of(request)
             ),
@@ -190,7 +197,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("request.unhandled_error", path=request.url.path)
+        logger.error(
+            "request.unhandled_error", request_id=request_id_of(request), reason=type(exc).__name__
+        )
         return JSONResponse(
             status_code=500,
             content=error_body(
@@ -201,7 +210,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(ops_router)
-    app.include_router(api_router, prefix="/api/v1")
+    app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(enforce_rate_limit)])
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, Any]:

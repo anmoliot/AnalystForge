@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
-from analystforge.quant.money import ONE, ZERO, discount_factor, quantize, to_decimal
+from analystforge.quant.money import ONE, ZERO, discount_factor, quantize
 
 
 class ResidualIncomeTerminalMethod(StrEnum):
@@ -139,7 +139,8 @@ def residual_income_valuation(assumptions: ResidualIncomeAssumptions) -> Residua
         terminal_value = final_ri / assumptions.cost_of_equity
     elif assumptions.terminal_method is ResidualIncomeTerminalMethod.GORDON_GROWTH:
         terminal_value = (
-            final_ri * (ONE + assumptions.terminal_growth)
+            final_ri
+            * (ONE + assumptions.terminal_growth)
             / (assumptions.cost_of_equity - assumptions.terminal_growth)
         )
     else:  # ResidualIncomeTerminalMethod.PERSISTENCE_FACTOR

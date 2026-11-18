@@ -24,12 +24,12 @@
   --elevated: 250 251 253;
   --line: 216 222 231;
   --ink: 17 24 39;
-  --muted: 100 116 139;
-  --accent: 14 124 107;
+  --muted: 79 94 113;
+  --accent: 10 105 90;
   --accent-ink: 255 255 255;
-  --positive: 22 130 93;
+  --positive: 12 103 67;
   --negative: 190 40 40;
-  --warning: 161 120 10;
+  --warning: 115 79 5;
   color-scheme: light;
 }
 

@@ -21,7 +21,6 @@ from analystforge.quant.optimization import min_variance
 from analystforge.quant.returns import cumulative_return, simple_returns
 from analystforge.quant.risk import (
     cvar_historical,
-    cvar_parametric,
     drawdown_series,
     max_drawdown,
     risk_contributions,
@@ -100,7 +99,9 @@ def test_cumulative_return_matches_the_compounded_return_series(positive: list[f
         max_size=3,
     ),
 )
-def test_risk_contributions_sum_to_one(asset_returns: list[float], raw_weights: list[float]) -> None:
+def test_risk_contributions_sum_to_one(
+    asset_returns: list[float], raw_weights: list[float]
+) -> None:
     loadings = np.diag(asset_returns) + 0.25 * np.ones((3, 3))
     covariance = loadings @ loadings.T
     total = sum(raw_weights)
@@ -194,9 +195,7 @@ def test_a_no_growth_dcf_is_independent_of_the_forecast_horizon(
 @given(
     beta=st.floats(min_value=-3.0, max_value=3.0, allow_nan=False, allow_infinity=False),
     tax_rate=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-    debt_to_equity=st.floats(
-        min_value=0.0, max_value=5.0, allow_nan=False, allow_infinity=False
-    ),
+    debt_to_equity=st.floats(min_value=0.0, max_value=5.0, allow_nan=False, allow_infinity=False),
 )
 def test_hamada_unlevering_relevers_to_the_original_beta(
     beta: float,
@@ -267,9 +266,7 @@ def _composition_of_one_hundred() -> st.SearchStrategy[list[int]]:
 @given(
     portfolio_weights=_composition_of_one_hundred(),
     benchmark_weights=_composition_of_one_hundred(),
-    returns=st.lists(
-        st.integers(min_value=-5_000, max_value=5_000), min_size=6, max_size=6
-    ),
+    returns=st.lists(st.integers(min_value=-5_000, max_value=5_000), min_size=6, max_size=6),
 )
 def test_brinson_effects_always_reconcile_for_admissible_weights(
     portfolio_weights: list[int],
@@ -290,6 +287,4 @@ def test_brinson_effects_always_reconcile_for_admissible_weights(
 
     reconciled = result.allocation + result.selection + result.interaction
     assert abs(reconciled - result.active_return) <= D("1e-18")
-    assert abs(
-        sum((row.total for row in result.rows), D("0")) - result.active_return
-    ) <= D("1e-18")
+    assert abs(sum((row.total for row in result.rows), D("0")) - result.active_return) <= D("1e-18")

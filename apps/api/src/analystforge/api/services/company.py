@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -13,14 +13,13 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analystforge.api.models.market import Exchange, Instrument, InstrumentProviderSymbol, PriceBar
-from analystforge.api.models.research import Filing, FundamentalFact
+from analystforge.api.models.research import FundamentalFact
 from analystforge.quant.money import to_decimal
-from analystforge.quant.ratios import MarketData, RatioCategory, RatioResult, compute_ratios
+from analystforge.quant.ratios import MarketData, compute_ratios
 from analystforge.quant.statements import (
     FinancialFact,
     FinancialStatements,
     FiscalPeriod,
-    LineItem,
     NormalizedStatement,
     StatementType,
     normalize_statement,
@@ -72,9 +71,7 @@ async def get_instrument_by_symbol(
     return result.scalar_one_or_none()
 
 
-async def get_company_overview(
-    session: AsyncSession, instrument: Instrument
-) -> CompanyOverview:
+async def get_company_overview(session: AsyncSession, instrument: Instrument) -> CompanyOverview:
     # Exchange details
     exchange = await session.get(Exchange, instrument.exchange_code)
     exchange_name = exchange.name if exchange else instrument.exchange_code
@@ -161,9 +158,8 @@ async def get_price_history(
     end: date | None = None,
     limit: int = 1000,
 ) -> list[dict[str, Any]]:
-    query = (
-        select(PriceBar)
-        .where(PriceBar.instrument_id == instrument_id, PriceBar.interval == interval)
+    query = select(PriceBar).where(
+        PriceBar.instrument_id == instrument_id, PriceBar.interval == interval
     )
     if start:
         query = query.where(PriceBar.ts >= datetime.combine(start, datetime.min.time(), tzinfo=UTC))
@@ -181,7 +177,9 @@ async def get_price_history(
             "high": float(bar.high),
             "low": float(bar.low),
             "close": float(bar.close),
-            "adjusted_close": float(bar.adjusted_close) if bar.adjusted_close is not None else float(bar.close),
+            "adjusted_close": float(bar.adjusted_close)
+            if bar.adjusted_close is not None
+            else float(bar.close),
             "volume": bar.volume or 0,
         }
         for bar in bars
@@ -209,7 +207,9 @@ async def load_financial_statements(
             value=f.value,
             unit=f.unit,
             period_end=f.period_end,
-            period_start=f.period_start if f.period_start and f.period_start != f.period_end else None,
+            period_start=f.period_start
+            if f.period_start and f.period_start != f.period_end
+            else None,
             fiscal_year=f.fiscal_year or f.period_end.year,
             fiscal_period=f.fiscal_period or "FY",
             form=f.form,
@@ -230,18 +230,20 @@ async def load_financial_statements(
             cf: NormalizedStatement | None = None
             try:
                 cf = normalize_statement(facts, StatementType.CASH_FLOW, yr, FiscalPeriod.FY)
-            except Exception:
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "operation unavailable (%s)", type(exc).__name__
+                )
                 cf = None
             statements_list.append(FinancialStatements(income=inc, balance=bal, cashflow=cf))
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).warning("operation unavailable (%s)", type(exc).__name__)
             continue
 
     return statements_list
 
 
-async def get_company_ratios(
-    session: AsyncSession, instrument: Instrument
-) -> list[dict[str, Any]]:
+async def get_company_ratios(session: AsyncSession, instrument: Instrument) -> list[dict[str, Any]]:
     """Compute and format all ratios for the instrument."""
     statements = await load_financial_statements(session, instrument.id)
     if not statements:
@@ -274,14 +276,18 @@ async def get_company_ratios(
     )
 
     out: list[dict[str, Any]] = []
-    for key, item in ratios_dict.items():
+    for _key, item in ratios_dict.items():
         val = item.value
         numeric_val: float | None = None
         if val is not None:
             numeric_val = float(val)
 
         inputs_formatted = {
-            k: float(v) if isinstance(v, (Decimal, int, float)) and v is not None else str(v) if v is not None else None
+            k: float(v)
+            if isinstance(v, (Decimal, int, float)) and v is not None
+            else str(v)
+            if v is not None
+            else None
             for k, v in item.inputs.items()
         }
 

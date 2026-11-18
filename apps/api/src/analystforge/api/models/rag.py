@@ -56,15 +56,15 @@ class ResearchMessage(Base):
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
-    __table_args__ = (
-        Index("ix_doc_chunks_inst_source", "instrument_id", "source_type"),
-    )
+    __table_args__ = (Index("ix_doc_chunks_inst_source", "instrument_id", "source_type"),)
 
     id: Mapped[uuid.UUID] = uuid_pk()
     instrument_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("instruments.id", ondelete="CASCADE"), index=True
     )
-    source_type: Mapped[str] = mapped_column(String(32), nullable=False)  # "FILING" | "NEWS" | "FACT" | "NOTES"
+    source_type: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # "FILING" | "NEWS" | "FACT" | "NOTES"
     source_id: Mapped[str] = mapped_column(String(128), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     section: Mapped[str | None] = mapped_column(String(128))
