@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Curated 50-name research universe covering three listings venues. Symbols are provider-native identifiers; CIKs are SEC central index keys for US filers.",
+  "description": "Curated 54-listing research universe covering NASDAQ, LSE, XETRA, NSE and BSE. Provider-native symbols identify each listing separately. SEC CIKs are present only for US filers.",
   "exchanges": [
     {
       "code": "NASDAQ",
@@ -25,6 +25,22 @@
       "country": "DE",
       "timezone": "Europe/Berlin",
       "currency": "EUR"
+    },
+    {
+      "code": "NSE",
+      "name": "National Stock Exchange of India",
+      "mic": "XNSE",
+      "country": "IN",
+      "timezone": "Asia/Kolkata",
+      "currency": "INR"
+    },
+    {
+      "code": "BSE",
+      "name": "BSE Limited",
+      "mic": "XBOM",
+      "country": "IN",
+      "timezone": "Asia/Kolkata",
+      "currency": "INR"
     }
   ],
   "instruments": [
@@ -38,7 +54,11 @@
       "sector": "Information Technology",
       "industry": "Technology Hardware, Storage and Peripherals",
       "description": "Designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells related services.",
-      "symbols": {"yahoo": "AAPL", "stooq": "aapl.us", "sec_edgar": "0000320193"}
+      "symbols": {
+        "yahoo": "AAPL",
+        "stooq": "aapl.us",
+        "sec_edgar": "0000320193"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -50,7 +70,11 @@
       "sector": "Information Technology",
       "industry": "Software",
       "description": "Develops and licenses software, services, devices and solutions, including productivity, cloud and personal computing offerings.",
-      "symbols": {"yahoo": "MSFT", "stooq": "msft.us", "sec_edgar": "0000789019"}
+      "symbols": {
+        "yahoo": "MSFT",
+        "stooq": "msft.us",
+        "sec_edgar": "0000789019"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -62,7 +86,11 @@
       "sector": "Communication Services",
       "industry": "Interactive Media and Services",
       "description": "Holding company for Google, providing search, advertising, cloud, YouTube and other platforms and services.",
-      "symbols": {"yahoo": "GOOGL", "stooq": "googl.us", "sec_edgar": "0001652044"}
+      "symbols": {
+        "yahoo": "GOOGL",
+        "stooq": "googl.us",
+        "sec_edgar": "0001652044"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -74,7 +102,11 @@
       "sector": "Consumer Discretionary",
       "industry": "Broadline Retail",
       "description": "Operates online and physical retail, marketplace, advertising, subscription and cloud computing businesses.",
-      "symbols": {"yahoo": "AMZN", "stooq": "amzn.us", "sec_edgar": "0001018724"}
+      "symbols": {
+        "yahoo": "AMZN",
+        "stooq": "amzn.us",
+        "sec_edgar": "0001018724"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -86,7 +118,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Designs accelerated computing platforms, GPUs, data-centre systems and software for gaming, AI and professional markets.",
-      "symbols": {"yahoo": "NVDA", "stooq": "nvda.us", "sec_edgar": "0001045810"}
+      "symbols": {
+        "yahoo": "NVDA",
+        "stooq": "nvda.us",
+        "sec_edgar": "0001045810"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -98,7 +134,11 @@
       "sector": "Communication Services",
       "industry": "Interactive Media and Services",
       "description": "Operates Facebook, Instagram, Messenger, WhatsApp and Reality Labs products and advertising platforms.",
-      "symbols": {"yahoo": "META", "stooq": "meta.us", "sec_edgar": "0001326801"}
+      "symbols": {
+        "yahoo": "META",
+        "stooq": "meta.us",
+        "sec_edgar": "0001326801"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -110,7 +150,11 @@
       "sector": "Consumer Discretionary",
       "industry": "Automobiles",
       "description": "Designs, develops, manufactures and sells electric vehicles, energy generation and storage systems.",
-      "symbols": {"yahoo": "TSLA", "stooq": "tsla.us", "sec_edgar": "0001318605"}
+      "symbols": {
+        "yahoo": "TSLA",
+        "stooq": "tsla.us",
+        "sec_edgar": "0001318605"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -122,7 +166,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Designs and supplies semiconductor and infrastructure software solutions for data centre, networking and broadband markets.",
-      "symbols": {"yahoo": "AVGO", "stooq": "avgo.us", "sec_edgar": "0001730168"}
+      "symbols": {
+        "yahoo": "AVGO",
+        "stooq": "avgo.us",
+        "sec_edgar": "0001730168"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -134,7 +182,11 @@
       "sector": "Consumer Staples",
       "industry": "Consumer Staples Distribution and Retail",
       "description": "Operates membership-based warehouse clubs offering groceries, general merchandise and ancillary services.",
-      "symbols": {"yahoo": "COST", "stooq": "cost.us", "sec_edgar": "0000909832"}
+      "symbols": {
+        "yahoo": "COST",
+        "stooq": "cost.us",
+        "sec_edgar": "0000909832"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -146,7 +198,11 @@
       "sector": "Communication Services",
       "industry": "Entertainment",
       "description": "Provides streaming entertainment services including series, films and games across global markets.",
-      "symbols": {"yahoo": "NFLX", "stooq": "nflx.us", "sec_edgar": "0001065280"}
+      "symbols": {
+        "yahoo": "NFLX",
+        "stooq": "nflx.us",
+        "sec_edgar": "0001065280"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -158,7 +214,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Supplies x86 processors, GPUs, adaptive SoCs and data-centre accelerators for client, server and embedded markets.",
-      "symbols": {"yahoo": "AMD", "stooq": "amd.us", "sec_edgar": "0000002488"}
+      "symbols": {
+        "yahoo": "AMD",
+        "stooq": "amd.us",
+        "sec_edgar": "0000002488"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -170,7 +230,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Designs and manufactures processors, chipsets, networking and other computing platforms, and operates foundry services.",
-      "symbols": {"yahoo": "INTC", "stooq": "intc.us", "sec_edgar": "0000050863"}
+      "symbols": {
+        "yahoo": "INTC",
+        "stooq": "intc.us",
+        "sec_edgar": "0000050863"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -182,7 +246,11 @@
       "sector": "Information Technology",
       "industry": "Communications Equipment",
       "description": "Provides networking hardware, software, security and collaboration products and services.",
-      "symbols": {"yahoo": "CSCO", "stooq": "csco.us", "sec_edgar": "0000858877"}
+      "symbols": {
+        "yahoo": "CSCO",
+        "stooq": "csco.us",
+        "sec_edgar": "0000858877"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -194,7 +262,11 @@
       "sector": "Information Technology",
       "industry": "Software",
       "description": "Provides creative, document, marketing and experience cloud software and digital media tools.",
-      "symbols": {"yahoo": "ADBE", "stooq": "adbe.us", "sec_edgar": "0000796343"}
+      "symbols": {
+        "yahoo": "ADBE",
+        "stooq": "adbe.us",
+        "sec_edgar": "0000796343"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -206,7 +278,11 @@
       "sector": "Consumer Staples",
       "industry": "Beverages",
       "description": "Manufactures and markets beverages, snacks and convenient foods under global brands.",
-      "symbols": {"yahoo": "PEP", "stooq": "pep.us", "sec_edgar": "0000040987"}
+      "symbols": {
+        "yahoo": "PEP",
+        "stooq": "pep.us",
+        "sec_edgar": "0000040987"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -218,7 +294,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Develops wireless technology, mobile processors, RF systems and licenses related intellectual property.",
-      "symbols": {"yahoo": "QCOM", "stooq": "qcom.us", "sec_edgar": "0000804328"}
+      "symbols": {
+        "yahoo": "QCOM",
+        "stooq": "qcom.us",
+        "sec_edgar": "0000804328"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -230,7 +310,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Designs and manufactures analog and embedded processing semiconductors for industrial and automotive markets.",
-      "symbols": {"yahoo": "TXN", "stooq": "txn.us", "sec_edgar": "0000097476"}
+      "symbols": {
+        "yahoo": "TXN",
+        "stooq": "txn.us",
+        "sec_edgar": "0000097476"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -242,7 +326,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductor Materials and Equipment",
       "description": "Supplies semiconductor wafer fabrication equipment, services and display manufacturing systems.",
-      "symbols": {"yahoo": "AMAT", "stooq": "amat.us", "sec_edgar": "0000006951"}
+      "symbols": {
+        "yahoo": "AMAT",
+        "stooq": "amat.us",
+        "sec_edgar": "0000006951"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -254,7 +342,11 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Manufactures DRAM and NAND memory products and storage solutions for data centre, mobile and embedded markets.",
-      "symbols": {"yahoo": "MU", "stooq": "mu.us", "sec_edgar": "0000723125"}
+      "symbols": {
+        "yahoo": "MU",
+        "stooq": "mu.us",
+        "sec_edgar": "0000723125"
+      }
     },
     {
       "exchange": "NASDAQ",
@@ -266,7 +358,11 @@
       "sector": "Financials",
       "industry": "Financial Services",
       "description": "Operates digital payment platforms for consumers and merchants, including wallets, checkout and credit products.",
-      "symbols": {"yahoo": "PYPL", "stooq": "pypl.us", "sec_edgar": "0001633917"}
+      "symbols": {
+        "yahoo": "PYPL",
+        "stooq": "pypl.us",
+        "sec_edgar": "0001633917"
+      }
     },
     {
       "exchange": "LSE",
@@ -277,7 +373,10 @@
       "sector": "Energy",
       "industry": "Integrated Oil and Gas",
       "description": "Integrated energy company engaged in oil and gas exploration, production, refining, trading and low-carbon energy.",
-      "symbols": {"yahoo": "SHEL.L", "stooq": "shel.uk"}
+      "symbols": {
+        "yahoo": "SHEL.L",
+        "stooq": "shel.uk"
+      }
     },
     {
       "exchange": "LSE",
@@ -288,7 +387,9 @@
       "sector": "Health Care",
       "industry": "Pharmaceuticals",
       "description": "Researches, develops and commercialises prescription medicines in oncology, cardiovascular, respiratory and immunology.",
-      "symbols": {"yahoo": "AZN.L"}
+      "symbols": {
+        "yahoo": "AZN.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -299,7 +400,9 @@
       "sector": "Financials",
       "industry": "Banks",
       "description": "Global banking and financial services group serving retail, commercial, wealth and institutional clients.",
-      "symbols": {"yahoo": "HSBA.L"}
+      "symbols": {
+        "yahoo": "HSBA.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -310,7 +413,9 @@
       "sector": "Consumer Staples",
       "industry": "Household and Personal Products",
       "description": "Supplies beauty, personal care, home care, nutrition and ice-cream brands across global markets.",
-      "symbols": {"yahoo": "ULVR.L"}
+      "symbols": {
+        "yahoo": "ULVR.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -321,7 +426,9 @@
       "sector": "Energy",
       "industry": "Integrated Oil and Gas",
       "description": "Integrated energy business spanning upstream oil and gas, refining, marketing, trading and low-carbon investments.",
-      "symbols": {"yahoo": "BP.L"}
+      "symbols": {
+        "yahoo": "BP.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -332,7 +439,9 @@
       "sector": "Health Care",
       "industry": "Pharmaceuticals",
       "description": "Develops and supplies vaccines, specialty medicines and general pharmaceuticals.",
-      "symbols": {"yahoo": "GSK.L"}
+      "symbols": {
+        "yahoo": "GSK.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -343,7 +452,9 @@
       "sector": "Industrials",
       "industry": "Professional Services",
       "description": "Provides information-based analytics and decision tools for professional and business customers.",
-      "symbols": {"yahoo": "REL.L"}
+      "symbols": {
+        "yahoo": "REL.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -354,7 +465,9 @@
       "sector": "Materials",
       "industry": "Metals and Mining",
       "description": "Mines and processes iron ore, aluminium, copper, minerals and other industrial materials.",
-      "symbols": {"yahoo": "RIO.L"}
+      "symbols": {
+        "yahoo": "RIO.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -365,7 +478,9 @@
       "sector": "Financials",
       "industry": "Banks",
       "description": "Retail and commercial bank operating through Lloyds, Halifax, Bank of Scotland and related brands.",
-      "symbols": {"yahoo": "LLOY.L"}
+      "symbols": {
+        "yahoo": "LLOY.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -376,7 +491,9 @@
       "sector": "Financials",
       "industry": "Banks",
       "description": "Diversified bank providing retail, corporate, investment banking, wealth and payments services.",
-      "symbols": {"yahoo": "BARC.L"}
+      "symbols": {
+        "yahoo": "BARC.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -387,7 +504,9 @@
       "sector": "Consumer Staples",
       "industry": "Beverages",
       "description": "Produces and distributes spirits, beer and ready-to-drink beverages across global markets.",
-      "symbols": {"yahoo": "DGE.L"}
+      "symbols": {
+        "yahoo": "DGE.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -398,7 +517,9 @@
       "sector": "Consumer Staples",
       "industry": "Tobacco",
       "description": "Manufactures and markets tobacco and nicotine products, including reduced-risk alternatives.",
-      "symbols": {"yahoo": "BATS.L"}
+      "symbols": {
+        "yahoo": "BATS.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -409,7 +530,9 @@
       "sector": "Utilities",
       "industry": "Electric Utilities",
       "description": "Owns and operates electricity and gas transmission and distribution networks in the UK and US.",
-      "symbols": {"yahoo": "NG.L"}
+      "symbols": {
+        "yahoo": "NG.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -420,7 +543,9 @@
       "sector": "Communication Services",
       "industry": "Wireless Telecommunication Services",
       "description": "Provides mobile, fixed-line, broadband and enterprise connectivity services across Europe and Africa.",
-      "symbols": {"yahoo": "VOD.L"}
+      "symbols": {
+        "yahoo": "VOD.L"
+      }
     },
     {
       "exchange": "LSE",
@@ -431,7 +556,9 @@
       "sector": "Consumer Staples",
       "industry": "Consumer Staples Distribution and Retail",
       "description": "Operates grocery stores, online retail and related financial services in the UK, Ireland and central Europe.",
-      "symbols": {"yahoo": "TSCO.L"}
+      "symbols": {
+        "yahoo": "TSCO.L"
+      }
     },
     {
       "exchange": "XETRA",
@@ -442,7 +569,9 @@
       "sector": "Information Technology",
       "industry": "Software",
       "description": "Provides enterprise application software, business intelligence and cloud ERP platforms.",
-      "symbols": {"yahoo": "SAP.DE"}
+      "symbols": {
+        "yahoo": "SAP.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -453,7 +582,9 @@
       "sector": "Industrials",
       "industry": "Industrial Conglomerates",
       "description": "Industrial technology company spanning automation, digital industries, smart infrastructure, mobility and healthcare equipment.",
-      "symbols": {"yahoo": "SIE.DE"}
+      "symbols": {
+        "yahoo": "SIE.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -464,7 +595,9 @@
       "sector": "Financials",
       "industry": "Insurance",
       "description": "Provides property, casualty, life and health insurance and asset management services.",
-      "symbols": {"yahoo": "ALV.DE"}
+      "symbols": {
+        "yahoo": "ALV.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -475,7 +608,9 @@
       "sector": "Communication Services",
       "industry": "Integrated Telecommunication Services",
       "description": "Provides mobile, fixed-line, internet and enterprise telecommunications services in Europe and the US.",
-      "symbols": {"yahoo": "DTE.DE"}
+      "symbols": {
+        "yahoo": "DTE.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -486,7 +621,9 @@
       "sector": "Consumer Discretionary",
       "industry": "Automobiles",
       "description": "Designs and manufactures premium passenger cars, vans and mobility services.",
-      "symbols": {"yahoo": "MBG.DE"}
+      "symbols": {
+        "yahoo": "MBG.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -497,7 +634,9 @@
       "sector": "Consumer Discretionary",
       "industry": "Automobiles",
       "description": "Manufactures premium automobiles and motorcycles and provides financial and mobility services.",
-      "symbols": {"yahoo": "BMW.DE"}
+      "symbols": {
+        "yahoo": "BMW.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -508,7 +647,9 @@
       "sector": "Materials",
       "industry": "Chemicals",
       "description": "Produces chemicals, materials, industrial solutions, surface technologies and agricultural solutions.",
-      "symbols": {"yahoo": "BAS.DE"}
+      "symbols": {
+        "yahoo": "BAS.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -519,7 +660,9 @@
       "sector": "Health Care",
       "industry": "Pharmaceuticals",
       "description": "Develops pharmaceuticals, consumer health products and crop science solutions.",
-      "symbols": {"yahoo": "BAYN.DE"}
+      "symbols": {
+        "yahoo": "BAYN.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -530,7 +673,9 @@
       "sector": "Information Technology",
       "industry": "Semiconductors",
       "description": "Supplies power semiconductors, microcontrollers, sensors and security solutions for automotive and industrial markets.",
-      "symbols": {"yahoo": "IFX.DE"}
+      "symbols": {
+        "yahoo": "IFX.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -541,7 +686,9 @@
       "sector": "Consumer Discretionary",
       "industry": "Textiles, Apparel and Luxury Goods",
       "description": "Designs, develops and markets athletic footwear, apparel and accessories globally.",
-      "symbols": {"yahoo": "ADS.DE"}
+      "symbols": {
+        "yahoo": "ADS.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -552,7 +699,9 @@
       "sector": "Consumer Discretionary",
       "industry": "Automobiles",
       "description": "Manufactures passenger cars, commercial vehicles and motorcycles through multiple brands, plus financial services.",
-      "symbols": {"yahoo": "VOW3.DE"}
+      "symbols": {
+        "yahoo": "VOW3.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -563,7 +712,9 @@
       "sector": "Health Care",
       "industry": "Pharmaceuticals",
       "description": "Operates life science, healthcare and electronics businesses supplying laboratory, drug and specialty materials.",
-      "symbols": {"yahoo": "MRK.DE"}
+      "symbols": {
+        "yahoo": "MRK.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -574,7 +725,9 @@
       "sector": "Industrials",
       "industry": "Aerospace and Defense",
       "description": "Supplies defence systems, vehicle components, weapons and ammunition, and industrial technology.",
-      "symbols": {"yahoo": "RHM.DE"}
+      "symbols": {
+        "yahoo": "RHM.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -585,7 +738,9 @@
       "sector": "Industrials",
       "industry": "Air Freight and Logistics",
       "description": "Provides express, parcel, freight forwarding and supply-chain logistics services worldwide.",
-      "symbols": {"yahoo": "DHL.DE"}
+      "symbols": {
+        "yahoo": "DHL.DE"
+      }
     },
     {
       "exchange": "XETRA",
@@ -596,7 +751,57 @@
       "sector": "Utilities",
       "industry": "Multi-Utilities",
       "description": "Operates energy networks, retail supply and renewable generation businesses across Europe.",
-      "symbols": {"yahoo": "EOAN.DE"}
+      "symbols": {
+        "yahoo": "EOAN.DE"
+      }
+    },
+    {
+      "exchange": "NSE",
+      "ticker": "RELIANCE.NS",
+      "name": "Reliance Industries Limited",
+      "asset_type": "equity",
+      "currency": "INR",
+      "sector": "Energy",
+      "industry": "Oil & Gas Refining & Marketing",
+      "symbols": {
+        "yahoo": "RELIANCE.NS"
+      }
+    },
+    {
+      "exchange": "NSE",
+      "ticker": "TCS.NS",
+      "name": "Tata Consultancy Services Limited",
+      "asset_type": "equity",
+      "currency": "INR",
+      "sector": "Information Technology",
+      "industry": "IT Services & Consulting",
+      "symbols": {
+        "yahoo": "TCS.NS"
+      }
+    },
+    {
+      "exchange": "BSE",
+      "ticker": "RELIANCE.BO",
+      "name": "Reliance Industries Limited",
+      "asset_type": "equity",
+      "currency": "INR",
+      "sector": "Energy",
+      "industry": "Oil & Gas Refining & Marketing",
+      "symbols": {
+        "yahoo": "RELIANCE.BO"
+      }
+    },
+    {
+      "exchange": "BSE",
+      "ticker": "TCS.BO",
+      "name": "Tata Consultancy Services Limited",
+      "asset_type": "equity",
+      "currency": "INR",
+      "sector": "Information Technology",
+      "industry": "IT Services & Consulting",
+      "symbols": {
+        "yahoo": "TCS.BO"
+      }
     }
   ]
 }

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from analystforge.api.db import Database
-from analystforge.api.models.market import Instrument
+from analystforge.api.models.market import Instrument, InstrumentProviderSymbol
 from analystforge.api.models.ops import ProviderHealthRecord
 from analystforge.api.models.research import FundamentalFact
 from analystforge.api.services.ingest import ingest_seed
@@ -40,15 +40,32 @@ async def test_coverage_is_empty_before_ingestion(client: httpx.AsyncClient) -> 
 async def test_seed_creates_reference_universe(db: Database, client: httpx.AsyncClient) -> None:
     summary = await ingest_seed(db)
     assert summary.status == "succeeded"
-    assert summary.counts["exchanges_created"] == 3
-    assert summary.counts["instruments_created"] == 50
+    assert summary.counts["exchanges_created"] == 5
+    assert summary.counts["instruments_created"] == 54
 
     coverage = (await client.get("/api/v1/data/coverage")).json()
     exchanges = {row["code"]: row for row in coverage["exchanges"]}
-    assert set(exchanges) == {"NASDAQ", "LSE", "XETRA"}
+    assert set(exchanges) == {"NASDAQ", "LSE", "XETRA", "NSE", "BSE"}
     assert exchanges["NASDAQ"]["instruments"] == 20
     assert exchanges["LSE"]["instruments"] == 15
     assert exchanges["XETRA"]["instruments"] == 15
+    for code in ("NSE", "BSE"):
+        assert exchanges[code]["instruments"] == 2
+        assert exchanges[code]["currency"] == "INR"
+    async with db.session() as session:
+        listings = (
+            await session.execute(
+                select(Instrument.ticker, Instrument.currency, InstrumentProviderSymbol.symbol)
+                .join(InstrumentProviderSymbol)
+                .where(
+                    Instrument.exchange_code.in_(["NSE", "BSE"]),
+                    InstrumentProviderSymbol.provider == "yahoo",
+                )
+            )
+        ).all()
+    assert set(listings) == {
+        (ticker, "INR", ticker) for ticker in ("RELIANCE.NS", "TCS.NS", "RELIANCE.BO", "TCS.BO")
+    }
     assert exchanges["LSE"]["currency"] == "GBP"
     assert coverage["prices"]["instruments"] == 0
 
@@ -59,7 +76,7 @@ async def test_seed_is_idempotent(db: Database, client: httpx.AsyncClient) -> No
     assert second.counts["exchanges_created"] == 0
     assert second.counts["instruments_created"] == 0
     coverage = (await client.get("/api/v1/data/coverage")).json()
-    assert sum(row["instruments"] for row in coverage["exchanges"]) == 50
+    assert sum(row["instruments"] for row in coverage["exchanges"]) == 54
 
 
 async def test_quality_reports_missing_datasets(db: Database, client: httpx.AsyncClient) -> None:
@@ -68,7 +85,7 @@ async def test_quality_reports_missing_datasets(db: Database, client: httpx.Asyn
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "fail"
-    assert body["instruments_checked"] == 50
+    assert body["instruments_checked"] == 54
     assert body["bars_checked"] == 0
     codes = {finding["code"] for finding in body["findings"]}
     assert "prices_missing" in codes
@@ -76,7 +93,7 @@ async def test_quality_reports_missing_datasets(db: Database, client: httpx.Asyn
     assert "macro_missing" in codes
     assert "fx_missing" in codes
     assert "news_missing" in codes
-    assert body["errors"] >= 50
+    assert body["errors"] >= 54
 
 
 async def test_quality_handles_ingested_fundamentals(
@@ -108,7 +125,7 @@ async def test_quality_handles_ingested_fundamentals(
     assert "fundamentals_missing" not in codes
     assert "fundamentals_stale" not in codes
     assert body["status"] == "fail"
-    assert body["instruments_checked"] == 50
+    assert body["instruments_checked"] == 54
 
 
 async def test_provider_health_lists_every_adapter(client: httpx.AsyncClient) -> None:
