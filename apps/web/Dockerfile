@@ -7,7 +7,7 @@ RUN npm ci --no-audit --no-fund
 COPY apps/web/ ./
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30.6-alpine3.24-slim AS runtime
 COPY infra/nginx/web.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80

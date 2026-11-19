@@ -16,7 +16,7 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 | **WP7** | Reporting and exports (PDF, PPTX tear sheets, Excel live formulas, Python SDK) | **Complete** | Built unified multi-format reporting service in `apps/api/src/analystforge/api/services/reports.py` supporting ReportLab PDF (`generate_pdf_report`), 16:9 widescreen PowerPoint (`generate_pptx_report` via `python-pptx`), live formula Excel (`generate_excel_report` via `xlsxwriter`), CSV, JSON, and Markdown; templates include Company Tear Sheet, Valuation Summary, DCF Model, Portfolio Review, Risk Report, and Backtest Performance; verified live formula recalculation (`=AVERAGE(...)`, `=SUM(...)`, `=B6-B7`) in Excel zip structure; strict format validation rejecting unsupported formats with HTTP 422 Unprocessable Content; report email dispatch via SMTP with binary file attachments in `services/alerts.py`; expanded Python SDK `analystforge_sdk.AnalystForgeClient` with `download_report`, `email_report`, `get_valuation`, `get_portfolio`, `get_filings`, `get_news`, and `integrations_meta`; SDK integration tests and API tests pass in `apps/api/tests/test_reports_wp7.py` and `packages/sdk-python/tests/test_sdk.py`. 106 API tests and 242 package tests pass. |
 | **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | **Complete** | Implemented secondary key-authenticated market data adapters: `TwelveDataPricesProvider` (`twelvedata.py`) and `AlphaVantagePricesProvider` (`alphavantage.py`); registered in `_PRICE_ADAPTERS` and `ProviderRegistry`; configured graceful degradation when keys are absent via `is_configured()`; tested multi-tier failover in `packages/providers/tests/test_secondary_prices_wp8.py` (Yahoo 500 error → Stooq browser challenge → Twelve Data ok with full `FailoverTrace` attempt recording); documented in `.env.example`; verified Continental European coverage with Deutsche Börse XETRA. All 75 provider tests pass. |
 | **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | **Complete** | Validated arq worker job suite in `apps/worker/src/analystforge/worker/main.py` with cron schedules for alerts (every 15 min), scheduled screens (twice daily), macro, prices, and news updates; implemented operational maintenance and database cleanup in `apps/api/src/analystforge/api/services/maintenance.py` (`run_operational_cleanup` deactivating expired `ShareLink`s, purging revoked `RefreshToken`s, and pruning stale health logs); updated `docker-compose.yml` with Groq LLM variables, mailpit SMTP catcher, and secondary providers; unit tests in `apps/worker/tests/test_worker_wp9.py` pass. |
-| **WP10** | Hardening & audits (Security, accessibility, performance) | Implemented, local gates passed | See WP10 executed evidence below. Container/Trivy and CI PostgreSQL browser execution remain unverified. |
+| **WP10** | Hardening & audits | Open | Hosted PostgreSQL, Playwright, Python, secret scanning, pip-audit and k6 passed. The API image build, web image scan and npm audit failed in the first hosted run. See the hosted results below. |
 | **WP11** | Truthful documentation & release | Documentation implemented, publication unverified | OpenAPI generation and version checker pass. User guide, API, runbook, security/contributor docs and changelog added. Release workflow YAML parses. Tag publication remains unexecuted. |
 
 ---
@@ -100,15 +100,13 @@ Official portable k6 2.3.0 ran locally from .tmp. Only the smoke profile was exe
 Load/stress profiles are implemented. `tests/load/smoke-result.json` preserves the summary.
 The test server raises API quotas to measure endpoint performance.
 
-Docker Engine and GNU Make are absent. Docker/Nginx runtime behaviour and Trivy execution
-remain unverified for this change. CI jobs are configured and their success is not claimed.
+Docker Engine and GNU Make are absent locally. Hosted results appear below.
 
 ## WP11 and review follow-up evidence on 2026-11-18
 
 - scripts/generate_api_docs.py ran successfully and generated the endpoint table from OpenAPI.
 - scripts/check_version.py passed with authoritative version 0.1.0.
-- Both workflow YAML files parsed and contained job definitions. Hosted actions and publication
-  require a tag/runner and have not been executed here.
+- Both workflow YAML files parsed and contained job definitions. The tag-triggered release remains unverified.
 - README, user guide, API reference, runbook, SECURITY.md, CONTRIBUTING.md and CHANGELOG.md
   exist. A local-link check found zero missing targets.
 - Python lint/format/mypy passed. Frontend typecheck, lint, 20 tests and production build passed.
@@ -122,8 +120,8 @@ remain unverified for this change. CI jobs are configured and their success is n
   and TCS, with INR currency, explicit Yahoo mappings and idempotent seeding assertions.
 - Explicit live tests for authenticated FRED/Groq skipped without keys. A separate public CSV
   FRED DGS10 request returned 23 observations. No credentials were printed.
-- Local Mailpit ports 1025/8025 had no listener. transformers and torch are absent. Mailpit delivery
-  and FinBERT loading remain unverified. SMTP tests use an in-process test server.
+- The initial verification found no local Mailpit listener or default FinBERT dependencies.
+  The optional integration runs below verified both paths.
 
 The hardening commit is 787d8be. Indian reference coverage is committed separately as 2246bb0.
 Current phase records defer to these work-package statuses and cannot independently establish
@@ -135,7 +133,7 @@ hardening or release completion.
   catcher on loopback ports 11025/18025. The application sender delivered a message whose recipient,
   subject, plain-text body, HTML body and attachment bytes were verified through the Mailpit API.
   `uv run python scripts/verify_mailpit.py` passed. Compose/CI now pin that version, and CI invokes
-  the same verifier against its Mailpit service. Hosted execution remains pending.
+  the same verifier against its Mailpit service.
 - Real FinBERT inference passed through `scripts/verify_finbert.py --model .tmp/finbert-snapshot`
   using an isolated uv environment with Transformers 5.22.2 and CPU PyTorch 2.15.0. The application
   returned backend finbert and valid probabilities for all three classes. Model resolution was
@@ -151,5 +149,32 @@ hardening or release completion.
 - Live Yahoo adapter reads passed for RELIANCE.NS, TCS.NS, RELIANCE.BO and TCS.BO. All returned INR
   bars. Three listings returned six bars between 2026-11-09 and 2026-11-17. RELIANCE.BO returned
   three bars from 2026-11-13 through 2026-11-17. This did not write to the application database.
-- Docker/Trivy/Compose execution, authenticated Groq/FRED checks and release publication remain
-  pending. Default workspace dependencies continue to exclude optional FinBERT packages.
+- Authenticated Groq/FRED checks and release publication remain pending. Default workspace
+  dependencies continue to exclude optional FinBERT packages.
+
+## Hosted verification of fea6a5c
+
+[GitHub Actions run 44299236345](https://github.com/anmoliot/AnalystForge/actions/runs/44299236345)
+completed with five passing jobs and three failing jobs.
+
+| Check | Result |
+| --- | --- |
+| Linux Python job | PostgreSQL migrations, Mailpit delivery and the coverage gate passed. Pytest reported 486 passed, two skipped and 95.47% quant branch coverage. |
+| PostgreSQL browser workflow | Playwright passed in 37.9 seconds, including the accessibility assertions. |
+| k6 smoke, pip-audit, Gitleaks | All three jobs passed. |
+| API Docker image | The dependency layer tried to install workspace packages before their source was copied. The build stopped before Trivy. |
+| Web Docker image | The image built. Trivy returned exit code 1 and uploaded its JSON findings. |
+| Web checks | npm audit reported 13 high and eight moderate findings and stopped the job before lint, types and tests. The high findings include dependency paths to picomatch. |
+
+The follow-up Dockerfile uses `--no-install-workspace` in the dependency layer. A
+manifest-only uv dry run resolved 123 external packages. Both Nginx references now use
+the official stable 1.30.6 Alpine slim image. A new hosted build and scan must verify these changes.
+The npm audit runs as a separate required workflow job so its result and the frontend test result
+are both visible. The upstream [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+listed all published versions through 4.0.7 as affected when checked.
+
+Bandit 1.9.4 scanned the API, worker and three library source trees locally with zero analysis
+errors. It reported three low findings and one medium finding for custom-strategy execution.
+CI retains the full report and fails on high findings or analysis errors. The ZAP passive plan
+checks responses from three fixed GET requests on the disposable loopback API and uploads an
+HTML report. Its first hosted result is pending.

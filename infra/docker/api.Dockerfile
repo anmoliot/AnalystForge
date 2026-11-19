@@ -15,7 +15,7 @@ COPY packages/sdk-python/pyproject.toml packages/sdk-python/pyproject.toml
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY apps/worker/pyproject.toml apps/worker/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project --all-packages
+    uv sync --frozen --no-dev --no-install-workspace --all-packages
 
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \

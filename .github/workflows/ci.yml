@@ -94,11 +94,20 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
-      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run
       - run: npm run build
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - working-directory: apps/web
+        run: npm audit --audit-level=high
 
   docker:
     name: Docker images build
@@ -136,6 +145,29 @@ jobs:
           name: trivy-${{ matrix.image }}
           path: trivy.json
 
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start isolated Compose stack
+        run: |
+          umask 077
+          python - <<'PY'
+          import secrets
+          from pathlib import Path
+          Path('.env').write_text(f'SECRET_KEY={secrets.token_hex(32)}\nPOSTGRES_PASSWORD={secrets.token_hex(24)}\n')
+          PY
+          docker compose up --build --detach --wait --wait-timeout 240
+      - name: Check API dependencies and web response through Nginx
+        run: |
+          curl -fsS http://127.0.0.1:8080/ready | jq -e '.status == "ready" and all(.checks[]; .status == "ok")'
+          curl -fsS -D "$RUNNER_TEMP/web-headers" http://127.0.0.1:8080/ -o "$RUNNER_TEMP/index.html"
+          grep -qi 'content-security-policy:' "$RUNNER_TEMP/web-headers"
+          grep -q 'id="root"' "$RUNNER_TEMP/index.html"
+      - if: always()
+        run: docker compose down --volumes
+
   dependencies:
     runs-on: ubuntu-latest
     steps:
@@ -149,6 +181,21 @@ jobs:
         with:
           name: python-advisories
           path: pip-audit.json
+
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Scan Python application sources
+        run: |
+          uvx --from bandit==1.9.4 bandit -r apps/api/src apps/worker/src packages/providers/src packages/quant/src packages/sdk-python/src -f json -o bandit.json --exit-zero
+          python -c "import json,sys; r=json.load(open('bandit.json')); sys.exit(bool(r['errors']) or any(f['issue_severity']=='HIGH' for f in r['results']))"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit
+          path: bandit.json
 
   secrets:
     runs-on: ubuntu-latest
@@ -208,6 +255,17 @@ jobs:
           trap 'kill "$api_pid"' EXIT
           curl --retry 60 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:8765/health
           k6 run tests/load/smoke.js
+          mkdir -p "$RUNNER_TEMP/zap"
+          sudo chown 1000 "$RUNNER_TEMP/zap"
+          docker run --rm --network host \
+            -v "$PWD/tests/security/zap.yaml:/zap/plan.yaml:ro" \
+            -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable zap.sh -cmd -autorun /zap/plan.yaml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-passive
+          path: ${{ runner.temp }}/zap/report.html
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

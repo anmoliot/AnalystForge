@@ -2,12 +2,12 @@
 
 Verified evidence is in PROGRESS.md. Historical delivery records describe earlier runs.
 
-- Windows gates pass with 95.52% quant branch coverage. Docker Engine and GNU Make are absent.
-  Compose, Nginx, Trivy images, the release workflow and GHCR publication remain unexecuted
-  for this change. CI success is not claimed.
-- Browser verification uses ephemeral SQLite and historical AAPL/SEC fixtures. CI configures
-  a separate PostgreSQL database. That path remains unverified. TimescaleDB and pgvector-specific
-  behaviour were not exercised locally.
+- Windows pytest passed with 95.52% quant branch coverage. Hosted Linux pytest passed with
+  95.47%. The first hosted API image build failed during workspace installation. The web image
+  built and failed Trivy. Corrective Dockerfile changes await hosted verification. The full
+  Compose stack, release workflow and GHCR publication remain unverified.
+- Playwright passed against ephemeral SQLite locally and a separate PostgreSQL database in CI
+  using historical AAPL/SEC fixtures. TimescaleDB and pgvector-specific behaviour remain unverified.
 - Authenticated FRED/Groq tests skipped without keys. A separate live FRED public CSV check on
   2026-11-18 returned 23 DGS10 observations. Paid providers use recorded tests. Yahoo is unofficial,
   Stooq can return browser challenges, and provider redistribution rights need deployment review.
@@ -30,8 +30,9 @@ Verified evidence is in PROGRESS.md. Historical delivery records describe earlie
 - Axe found no serious/critical violations on nine pages in both themes. Lower-impact findings are
   retained in docs/screenshots/wp10-accessibility.json. Dialogs, mobile navigation and all advanced
   controls need further review.
-- npm audit passes the high gate with nine moderate findings. pip-audit found no known Python
-  vulnerabilities during verification. Advisory results can change.
+- Hosted npm audit reported 13 high and eight moderate findings. The upstream picomatch
+  advisory listed no patched release. Hosted pip-audit and Gitleaks passed. The local Bandit
+  scan reported one medium and three low findings. See PROGRESS.md for the CI run.
 - Backup scripts require Docker and Unix utilities. Upstream pipeline failure detection and restore
   rehearsal remain pending. A generated backup file alone does not prove recoverability.
 - FinBERT and embedding-model downloads depend on available weights/network access. Lexical fallbacks

@@ -1,6 +1,7 @@
 .git
 .gitignore
 .venv
+.tmp
 **/__pycache__
 **/*.pyc
 **/.pytest_cache
