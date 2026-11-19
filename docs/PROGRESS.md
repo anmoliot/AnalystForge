@@ -16,7 +16,7 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 | **WP7** | Reporting and exports (PDF, PPTX tear sheets, Excel live formulas, Python SDK) | **Complete** | Built unified multi-format reporting service in `apps/api/src/analystforge/api/services/reports.py` supporting ReportLab PDF (`generate_pdf_report`), 16:9 widescreen PowerPoint (`generate_pptx_report` via `python-pptx`), live formula Excel (`generate_excel_report` via `xlsxwriter`), CSV, JSON, and Markdown; templates include Company Tear Sheet, Valuation Summary, DCF Model, Portfolio Review, Risk Report, and Backtest Performance; verified live formula recalculation (`=AVERAGE(...)`, `=SUM(...)`, `=B6-B7`) in Excel zip structure; strict format validation rejecting unsupported formats with HTTP 422 Unprocessable Content; report email dispatch via SMTP with binary file attachments in `services/alerts.py`; expanded Python SDK `analystforge_sdk.AnalystForgeClient` with `download_report`, `email_report`, `get_valuation`, `get_portfolio`, `get_filings`, `get_news`, and `integrations_meta`; SDK integration tests and API tests pass in `apps/api/tests/test_reports_wp7.py` and `packages/sdk-python/tests/test_sdk.py`. 106 API tests and 242 package tests pass. |
 | **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | **Complete** | Implemented secondary key-authenticated market data adapters: `TwelveDataPricesProvider` (`twelvedata.py`) and `AlphaVantagePricesProvider` (`alphavantage.py`); registered in `_PRICE_ADAPTERS` and `ProviderRegistry`; configured graceful degradation when keys are absent via `is_configured()`; tested multi-tier failover in `packages/providers/tests/test_secondary_prices_wp8.py` (Yahoo 500 error → Stooq browser challenge → Twelve Data ok with full `FailoverTrace` attempt recording); documented in `.env.example`; verified Continental European coverage with Deutsche Börse XETRA. All 75 provider tests pass. |
 | **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | **Complete** | Validated arq worker job suite in `apps/worker/src/analystforge/worker/main.py` with cron schedules for alerts (every 15 min), scheduled screens (twice daily), macro, prices, and news updates; implemented operational maintenance and database cleanup in `apps/api/src/analystforge/api/services/maintenance.py` (`run_operational_cleanup` deactivating expired `ShareLink`s, purging revoked `RefreshToken`s, and pruning stale health logs); updated `docker-compose.yml` with Groq LLM variables, mailpit SMTP catcher, and secondary providers; unit tests in `apps/worker/tests/test_worker_wp9.py` pass. |
-| **WP10** | Hardening & audits | Open | Hosted PostgreSQL, Playwright, Python, secret scanning, pip-audit and k6 passed. The API image build, web image scan and npm audit failed in the first hosted run. See the hosted results below. |
+| **WP10** | Hardening & audits | CI gates passed; strategy isolation open | Both Trivy scans, Compose, PostgreSQL, Playwright/axe, audits and k6 passed. OS-level filesystem/network isolation for untrusted custom strategies remains outstanding. See SECURITY.md. |
 | **WP11** | Truthful documentation & release | Documentation implemented, publication unverified | OpenAPI generation and version checker pass. User guide, API, runbook, security/contributor docs and changelog added. Release workflow YAML parses. Tag publication remains unexecuted. |
 
 ---
@@ -167,8 +167,8 @@ completed with five passing jobs and three failing jobs.
 | Web checks | npm audit reported 13 high and eight moderate findings and stopped the job before lint, types and tests. The high findings include dependency paths to picomatch. |
 
 The follow-up Dockerfile uses `--no-install-workspace` in the dependency layer. A
-manifest-only uv dry run resolved 123 external packages. Both Nginx references now use
-the official stable 1.30.6 Alpine slim image. A new hosted build and scan must verify these changes.
+manifest-only uv dry run resolved 123 external packages. The first follow-up used Nginx
+1.30.6 Alpine slim. Its Trivy report identified five findings fixed in 1.30.7.
 The npm audit runs as a separate required workflow job so its result and the frontend test result
 are both visible. The upstream [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
 listed all published versions through 4.0.7 as affected when checked.
@@ -177,4 +177,30 @@ Bandit 1.9.4 scanned the API, worker and three library source trees locally with
 errors. It reported three low findings and one medium finding for custom-strategy execution.
 CI retains the full report and fails on high findings or analysis errors. The ZAP passive plan
 checks responses from three fixed GET requests on the disposable loopback API and uploads an
-HTML report. Its first hosted result is pending.
+HTML report.
+
+## Container, audit and performance verification on 2026-11-19
+
+All 11 jobs passed on commit 70bca09. The API and web images passed the HIGH/CRITICAL Trivy
+gate. Docker Compose started the full stack, confirmed API database/Redis/storage readiness
+through Nginx and served the built React page with its CSP header. CI also ran PostgreSQL
+Playwright/axe, Bandit, the passive ZAP plan, k6 smoke, Mailpit, Gitleaks and both dependency
+audits. [Hosted results and artifacts](https://github.com/anmoliot/AnalystForge/actions/runs/44451680207).
+
+The API switched to a Wolfi Python 3.12 runtime after Trivy reported 113 Debian 12 package
+findings without fixed versions. Both Nginx containers now use 1.30.7. The frontend high
+gate passed with nine moderate npm findings after the earlier high advisory was withdrawn.
+[Advisory history](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
+
+The initial longer k6 runs exceeded the 500 ms p95 threshold. The screener fetched prices
+and facts in a loop over instruments. It now returns them in one SQL query. Repeating the same
+two-minute profiles against a freshly seeded local API on port 18765 produced these results.
+
+| Profile | Initial p95 | Updated p95 | Updated requests | Failed requests |
+| --- | ---: | ---: | ---: | ---: |
+| `k6 run tests/load/load.js`, 10 virtual users | 505.31 ms | 32.98 ms | 5,717 | 0 |
+| `k6 run tests/load/stress.js`, peak 50 virtual users | 1,762.43 ms | 337.76 ms | 9,682 | 0 |
+
+Both updated profiles passed every response check and threshold. The nine existing screener,
+macro and alert regression tests passed. An additional regression test verified the latest
+filing per instrument, derived metrics and missing values.

@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import Float, and_, desc, func, select
 
 from analystforge.api.deps import CurrentUser, SessionDep
 from analystforge.api.errors import NotFoundError
@@ -116,9 +116,38 @@ async def _execute_screener_query(
     payload: ScreenFilterRequest,
 ) -> list[dict[str, Any]]:
     """Query universe instruments, fetch latest real prices and fundamentals, and apply filters."""
+    latest_day = (
+        select(func.max(PriceBar.ts))
+        .where(PriceBar.instrument_id == Instrument.id, PriceBar.interval == "1d")
+        .correlate(Instrument)
+        .scalar_subquery()
+    )
+    concepts = ("CommonStockSharesOutstanding", "NetIncomeLoss", "StockholdersEquity")
+    latest_facts = [
+        select(FundamentalFact.value.cast(Float))
+        .where(FundamentalFact.instrument_id == Instrument.id, FundamentalFact.concept == concept)
+        .order_by(
+            FundamentalFact.period_end.desc(),
+            FundamentalFact.filed.desc(),
+            FundamentalFact.id.desc(),
+        )
+        .limit(1)
+        .correlate(Instrument)
+        .scalar_subquery()
+        for concept in concepts
+    ]
     stmt = (
-        select(Instrument, Exchange.code.label("exchange_code"))
+        select(Instrument, Exchange.code, PriceBar, *latest_facts)
+        .select_from(Instrument)
         .join(Exchange, Instrument.exchange_code == Exchange.code)
+        .join(
+            PriceBar,
+            and_(
+                PriceBar.instrument_id == Instrument.id,
+                PriceBar.interval == "1d",
+                PriceBar.ts == latest_day,
+            ),
+        )
         .where(Instrument.is_active.is_(True))
     )
 
@@ -133,39 +162,10 @@ async def _execute_screener_query(
     inst_rows = (await session.execute(stmt)).all()
     results: list[dict[str, Any]] = []
 
-    for inst, exch_code in inst_rows:
-        # Retrieve latest real price bar
-        latest_bar = (
-            await session.execute(
-                select(PriceBar)
-                .where(PriceBar.instrument_id == inst.id, PriceBar.interval == "1d")
-                .order_by(desc(PriceBar.ts))
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-
-        if not latest_bar:
-            continue
-
+    for inst, exch_code, latest_bar, shares_out, net_income, stockholders_equity in inst_rows:
         price = float(latest_bar.close)
         volume = float(latest_bar.volume) if latest_bar.volume is not None else None
-
-        # Retrieve fundamental facts (Net Income, Equity, Shares) if available
-        facts_stmt = (
-            select(FundamentalFact.concept, FundamentalFact.value)
-            .where(FundamentalFact.instrument_id == inst.id)
-            .order_by(desc(FundamentalFact.period_end))
-        )
-        facts = (await session.execute(facts_stmt)).fetchall()
-        fact_dict: dict[str, float] = {}
-        for concept, val in facts:
-            if concept not in fact_dict and val is not None:
-                fact_dict[concept] = float(val)
-
-        shares_out = fact_dict.get("CommonStockSharesOutstanding")
         mkt_cap = price * shares_out if shares_out is not None else None
-        net_income = fact_dict.get("NetIncomeLoss")
-        stockholders_equity = fact_dict.get("StockholdersEquity")
 
         pe_ratio: float | None = None
         if mkt_cap is not None and net_income and net_income > 0:

@@ -3,9 +3,9 @@
 Verified evidence is in PROGRESS.md. Historical delivery records describe earlier runs.
 
 - Windows pytest passed with 95.52% quant branch coverage. Hosted Linux pytest passed with
-  95.47%. The first hosted API image build failed during workspace installation. The web image
-  built and failed Trivy. Corrective Dockerfile changes await hosted verification. The full
-  Compose stack, release workflow and GHCR publication remain unverified.
+  95.47%. Both images passed the hosted HIGH/CRITICAL Trivy gate. CI started the full Compose
+  stack and checked readiness and the web response through Nginx. Release and GHCR publication
+  remain unverified.
 - Playwright passed against ephemeral SQLite locally and a separate PostgreSQL database in CI
   using historical AAPL/SEC fixtures. TimescaleDB and pgvector-specific behaviour remain unverified.
 - Authenticated FRED/Groq tests skipped without keys. A separate live FRED public CSV check on
@@ -25,13 +25,13 @@ Verified evidence is in PROGRESS.md. Historical delivery records describe earlie
 - Redis fallback quotas apply per process, increasing aggregate allowance across workers. Independent
   audit writes can fail after a successful mutation. A counter/error event exposes that interval.
   Database administrator privileges currently allow audit-row edits.
-- k6 smoke passed against disposable SQLite with elevated quotas. Load/stress profiles remain
-  unexecuted. The smoke measurement does not establish production capacity.
+- k6 smoke, load and stress passed against disposable SQLite with elevated quotas and recorded
+  data. Deployment capacity still requires measurement with representative traffic and storage.
 - Axe found no serious/critical violations on nine pages in both themes. Lower-impact findings are
   retained in docs/screenshots/wp10-accessibility.json. Dialogs, mobile navigation and all advanced
   controls need further review.
-- Hosted npm audit reported 13 high and eight moderate findings. The upstream picomatch
-  advisory listed no patched release. Hosted pip-audit and Gitleaks passed. The local Bandit
+- Hosted npm audit passed the high gate with nine moderate findings after the picomatch
+  advisory was withdrawn. Hosted pip-audit and Gitleaks passed. The local Bandit
   scan reported one medium and three low findings. See PROGRESS.md for the CI run.
 - Backup scripts require Docker and Unix utilities. Upstream pipeline failure detection and restore
   rehearsal remain pending. A generated backup file alone does not prove recoverability.
@@ -42,8 +42,8 @@ Verified evidence is in PROGRESS.md. Historical delivery records describe earlie
   The Hugging Face client stalled during model retrieval on this host. A direct official snapshot
   download with SHA-256 verification succeeded, and inference used that local snapshot offline.
 - Mailpit 1.33.1 delivery was verified natively on loopback ports 11025/18025, including plain text,
-  HTML and attachment bytes. Compose and external SMTP relay behaviour remain unverified. The
-  default ports 1025/8025 had no existing service. CI now includes the real Mailpit verifier.
+  HTML and attachment bytes. The hosted SMTP verifier also passed. Delivery through an external
+  relay remains unverified.
 - NSE/BSE live Yahoo adapter reads passed on 2026-11-18 for all four seeded listings. RELIANCE.NS,
   TCS.NS and TCS.BO returned six bars for the requested 2026-11-09 through 2026-11-17 interval.
   RELIANCE.BO returned three bars from November 13 onward. No application database was populated

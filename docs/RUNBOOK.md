@@ -74,9 +74,11 @@ the Compose/CI service pin.
 uv run python scripts/verify_mailpit.py
 ```
 
-For the Compose ports use `uv run python scripts/verify_mailpit.py --smtp-port 1025 --http-port 8025`.
-CI runs that command against its Mailpit service. Native verification does not establish Compose
-startup or external SMTP relay behaviour. [Official Mailpit releases](https://github.com/axllent/mailpit/releases).
+CI publishes both Mailpit service ports and runs
+`uv run python scripts/verify_mailpit.py --smtp-port 1025 --http-port 8025`. In the ordinary
+Compose stack, containers reach SMTP at `mailpit:1025` and the host can inspect captured mail at
+`http://127.0.0.1:8025`. External SMTP relay delivery requires a separate check.
+[Official Mailpit releases](https://github.com/axllent/mailpit/releases).
 
 FinBERT is optional. News ingestion respects FINBERT_ENABLED and FINBERT_MODEL, caches successfully
 loaded pipelines per model/process and applies tokenizer truncation at 512 tokens. With the flag

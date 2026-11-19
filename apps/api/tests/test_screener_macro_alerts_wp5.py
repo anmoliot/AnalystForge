@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -25,6 +25,7 @@ from sqlalchemy import select
 from analystforge.api.db import Database
 from analystforge.api.models.collaboration import ShareLink
 from analystforge.api.models.market import Exchange, Instrument, PriceBar
+from analystforge.api.models.research import FundamentalFact
 from analystforge.api.models.screener import AlertDelivery, AlertEvent, AlertRule, SavedScreen
 from analystforge.api.services.alerts import (
     evaluate_alert_rules,
@@ -231,6 +232,44 @@ async def test_screener_and_or_groups_and_export(
     json_resp = await client.get("/api/v1/screener/export?format=json", headers=auth_headers)
     assert json_resp.status_code == 200
     assert isinstance(json_resp.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_screen_uses_latest_filed_facts_per_instrument(
+    client: httpx.AsyncClient, auth_headers: dict[str, str], db: Database
+) -> None:
+    await _seed_screener_market_data(db)
+    async with db.session() as session:
+        instrument_id = await session.scalar(
+            select(Instrument.id).where(Instrument.ticker == "AAPL")
+        )
+        for concept, value, filing_day in [
+            ("CommonStockSharesOutstanding", 100, 5),
+            ("CommonStockSharesOutstanding", 200, 10),
+            ("NetIncomeLoss", 1000, 10),
+            ("StockholdersEquity", 8000, 10),
+        ]:
+            session.add(
+                FundamentalFact(
+                    instrument_id=instrument_id,
+                    taxonomy="us-gaap",
+                    concept=concept,
+                    unit="shares" if concept == "CommonStockSharesOutstanding" else "USD",
+                    value=Decimal(value),
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    filed=date(2026, 2, filing_day),
+                    form="10-K",
+                    accession=f"fixture-{filing_day}",
+                )
+            )
+    response = await client.post("/api/v1/screener/run", json={}, headers=auth_headers)
+    response.raise_for_status()
+    rows = {row["ticker"]: row for row in response.json()}
+    assert rows["AAPL"]["market_cap"] == 37100
+    assert rows["AAPL"]["pe_ratio"] == 37.1
+    assert rows["AAPL"]["roe"] == 0.125
+    assert rows["MSFT"]["market_cap"] is None
 
 
 @pytest.mark.asyncio
