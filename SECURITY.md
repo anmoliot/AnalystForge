@@ -30,10 +30,12 @@ quota. Resource failures return the ordinary envelope. Configure trusted proxy b
 accurate client addresses. HSTS is emitted only for HTTPS responses. The current Compose ingress
 uses HTTP and requires deployment TLS configuration.
 
-Custom Python execution is refused on Windows. Linux installs CPU, address-space, data and file-size
-limits before executing. AST restrictions and subprocess limits are implemented. This mechanism
-does not provide an OS-level filesystem/network isolation boundary for all NumPy/Pandas capabilities.
-Treat strategies as trusted until container/seccomp/network isolation has been independently audited.
+Custom Python strategies require Linux, libseccomp and a kernel that supports thread-synchronized
+seccomp filters. The child applies CPU, address-space, data and file-size limits. A syscall allowlist
+permits in-memory computation and anonymous allocation. File I/O, sockets, process creation and
+new file-backed mappings are denied. The child reports JSON through a bounded shared buffer.
+Strategy execution is refused if either the filter or the resource limits cannot be installed.
+The isolation controls have functional tests. An independent sandbox security audit remains outstanding.
 
 Never commit .env files. Rotate any actual exposed credentials. CI scans dependencies, history and
 images. Exact public-placeholder history exceptions are documented in .gitleaksignore.

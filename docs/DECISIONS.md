@@ -490,4 +490,14 @@ and downloaded model weights live outside the default dependency set, in ignored
 
 Mailpit verification uses a separate loopback catcher and the application's sender. It validates
 raw captured MIME and attachment bytes. The CI/Compose Mailpit pin matches the native version used
-for this check. This establishes native SMTP delivery while Docker orchestration remains pending.
+for this check. Native and hosted SMTP checks have passed. PROGRESS.md records Compose verification.
+
+## Linux strategy isolation
+
+The child prepares a seccomp filter before applying the memory limits so library initialization
+can finish. It loads the filter on all threads before compiling user code. An allowlist keeps
+filesystem and network operations outside the strategy's capabilities. Both missing kernel
+support and failed resource limits make the strategy unavailable. The result travels as bounded
+JSON in shared memory so the parent can validate it without deserializing child-supplied Python
+objects. Native Linux deployments need libseccomp and the locked pyseccomp binding. The API
+image includes both.

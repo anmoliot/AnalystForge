@@ -15,9 +15,10 @@ Verified evidence is in PROGRESS.md. Historical delivery records describe earlie
   migrated database can have schema gaps. Revision 0006 preserves older audit rows with null fields.
 - Registration assigns ADMIN and can join an existing tenant by name. RBAC enforcement, refresh-family
   reuse revocation and scoped API keys require further work. See SECURITY.md before multi-tenant use.
-- Linux strategy subprocesses have resource limits and AST restrictions. NumPy/Pandas capabilities
-  require OS-level network/filesystem isolation before treating arbitrary strategies as untrusted.
-  Windows execution is refused and Linux execution tests require a Linux runner.
+- Linux custom strategies require libseccomp, thread synchronization and Unix resource limits.
+  Lazy imports and library operations that require filesystem or network access are rejected.
+  The kernel policy has functional tests and awaits independent security review. Windows refuses
+  custom Python execution.
 - Reports now expose recorded closing-price metrics. Complete domain-specific report population still
   needs work. Excel formulas await sourced inputs. Advanced valuation methods accept JSON assumptions.
 - Settings shows actual profile data. Key/TOTP management uses the API. Admin team/audit browsing

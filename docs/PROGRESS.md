@@ -16,7 +16,7 @@ Updated continuously. Status is strictly evidence-based: a work package or phase
 | **WP7** | Reporting and exports (PDF, PPTX tear sheets, Excel live formulas, Python SDK) | **Complete** | Built unified multi-format reporting service in `apps/api/src/analystforge/api/services/reports.py` supporting ReportLab PDF (`generate_pdf_report`), 16:9 widescreen PowerPoint (`generate_pptx_report` via `python-pptx`), live formula Excel (`generate_excel_report` via `xlsxwriter`), CSV, JSON, and Markdown; templates include Company Tear Sheet, Valuation Summary, DCF Model, Portfolio Review, Risk Report, and Backtest Performance; verified live formula recalculation (`=AVERAGE(...)`, `=SUM(...)`, `=B6-B7`) in Excel zip structure; strict format validation rejecting unsupported formats with HTTP 422 Unprocessable Content; report email dispatch via SMTP with binary file attachments in `services/alerts.py`; expanded Python SDK `analystforge_sdk.AnalystForgeClient` with `download_report`, `email_report`, `get_valuation`, `get_portfolio`, `get_filings`, `get_news`, and `integrations_meta`; SDK integration tests and API tests pass in `apps/api/tests/test_reports_wp7.py` and `packages/sdk-python/tests/test_sdk.py`. 106 API tests and 242 package tests pass. |
 | **WP8** | Data & coverage (Alpha Vantage / Twelve Data failover, universe expansion) | **Complete** | Implemented secondary key-authenticated market data adapters: `TwelveDataPricesProvider` (`twelvedata.py`) and `AlphaVantagePricesProvider` (`alphavantage.py`); registered in `_PRICE_ADAPTERS` and `ProviderRegistry`; configured graceful degradation when keys are absent via `is_configured()`; tested multi-tier failover in `packages/providers/tests/test_secondary_prices_wp8.py` (Yahoo 500 error → Stooq browser challenge → Twelve Data ok with full `FailoverTrace` attempt recording); documented in `.env.example`; verified Continental European coverage with Deutsche Börse XETRA. All 75 provider tests pass. |
 | **WP9** | Worker & operations (Scheduled jobs, Docker compose verification) | **Complete** | Validated arq worker job suite in `apps/worker/src/analystforge/worker/main.py` with cron schedules for alerts (every 15 min), scheduled screens (twice daily), macro, prices, and news updates; implemented operational maintenance and database cleanup in `apps/api/src/analystforge/api/services/maintenance.py` (`run_operational_cleanup` deactivating expired `ShareLink`s, purging revoked `RefreshToken`s, and pruning stale health logs); updated `docker-compose.yml` with Groq LLM variables, mailpit SMTP catcher, and secondary providers; unit tests in `apps/worker/tests/test_worker_wp9.py` pass. |
-| **WP10** | Hardening & audits | CI gates passed; strategy isolation open | Both Trivy scans, Compose, PostgreSQL, Playwright/axe, audits and k6 passed. OS-level filesystem/network isolation for untrusted custom strategies remains outstanding. See SECURITY.md. |
+| **WP10** | Hardening & audits | Implemented and tested | Both Trivy scans, Compose, PostgreSQL, Playwright/axe, audits and k6 passed. Linux strategy isolation passed its positive computation and kernel denial checks. See the dated runs below. |
 | **WP11** | Truthful documentation & release | Documentation implemented, publication unverified | OpenAPI generation and version checker pass. User guide, API, runbook, security/contributor docs and changelog added. Release workflow YAML parses. Tag publication remains unexecuted. |
 
 ---
@@ -204,3 +204,14 @@ two-minute profiles against a freshly seeded local API on port 18765 produced th
 Both updated profiles passed every response check and threshold. The nine existing screener,
 macro and alert regression tests passed. An additional regression test verified the latest
 filing per instrument, derived metrics and missing values.
+
+## Linux strategy verification on 2026-11-19
+
+In a disposable Ubuntu WSL environment with the locked dependencies and CPython 3.12.16,
+`python -m pytest -q packages/quant/tests/test_backtest_quant.py packages/quant/tests/test_hardening.py`
+passed all 53 tests. The tests executed a NumPy strategy and checked the installed kernel
+filter in a separate process. Opening a known readable file and creating a socket both returned
+EPERM. Failure to prepare or install the filter is covered by separate tests.
+
+The Windows quant-only run passed 288 tests with two explicit Linux-only skips and 95.16%
+branch coverage. Ruff lint, format verification and strict quant mypy passed.

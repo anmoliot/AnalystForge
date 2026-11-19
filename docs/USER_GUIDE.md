@@ -16,7 +16,8 @@ setting up a fresh database for the complete product.
 4. Create a portfolio and record actual transactions or import a file. Inspect holdings, risk
    and transaction validation errors. Insufficient prices produce unavailable risk output.
 5. Use Backtest Lab for a built-in strategy or rule group. Review costs, lag, drawdown and
-   survivorship warnings. Python strategies require a trusted Linux execution environment.
+   survivorship warnings. Custom Python strategies require Linux with libseccomp. They compute on
+   the supplied data in memory. File access, networking and imports requiring new files are blocked.
 6. Run a screen and review the as-of dates. Save a screen or create alerts only after checking
    available inputs and delivery configuration. Missing market cap/ratios remain empty.
 7. Ask Research a question grounded in filings/news. Inspect citations and explicit refusals.

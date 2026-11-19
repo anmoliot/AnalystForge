@@ -10,7 +10,8 @@ Both routers and services issue SQLAlchemy queries. Providers retrieve external 
 provider identity and dates. PostgreSQL stores application data. Tests create metadata with
 SQLite. Deployment migrations target PostgreSQL, with later schema gaps tracked in KNOWN_LIMITATIONS.md.
 The quant package uses Decimal for valuation/accounting and floats for statistical models.
-Custom Python strategies require Unix resource limits and still need an OS isolation audit.
+Custom Python strategies run in a Linux child process with resource limits and a seccomp allowlist.
+The parent reads the result from bounded shared memory. SECURITY.md describes the isolation boundary.
 
 ## Authentication and request controls
 

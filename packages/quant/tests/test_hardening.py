@@ -1,5 +1,9 @@
 """Boundary checks for the sandbox and user-defined rule trees."""
 
+import errno
+import os
+import subprocess
+import sys
 from queue import Queue
 from types import SimpleNamespace
 
@@ -125,6 +129,7 @@ def test_runtime_import_restricts_modules():
 
 
 def test_worker_requires_every_limit_before_executing(prices, monkeypatch):
+    monkeypatch.setattr(sandbox, "prepare_strategy_filter", lambda: lambda: None)
     calls = []
     limits = SimpleNamespace(
         RLIMIT_CPU=1,
@@ -140,6 +145,13 @@ def test_worker_requires_every_limit_before_executing(prices, monkeypatch):
     assert [c[0] for c in calls] == [1, 2, 3, 4]
     assert calls[-1] == (4, (0, 0))
 
+    def filter_denied():
+        raise OSError("kernel refused filter")
+
+    monkeypatch.setattr(sandbox, "prepare_strategy_filter", lambda: filter_denied)
+    sandbox._worker_execute("raise ValueError('must never execute')", prices, results)
+    assert results.get()["unavailable"] is True
+
     def denied(*args):
         raise OSError("limit refused")
 
@@ -148,6 +160,10 @@ def test_worker_requires_every_limit_before_executing(prices, monkeypatch):
     error = results.get()
     assert error["unavailable"] is True
     assert "resource limits could not be installed" in error["error"]
+
+    monkeypatch.setattr(sandbox, "prepare_strategy_filter", filter_denied)
+    sandbox._worker_execute("raise ValueError('must never execute')", prices, results)
+    assert results.get()["unavailable"] is True
 
 
 @pytest.mark.parametrize(
@@ -159,6 +175,7 @@ def test_worker_requires_every_limit_before_executing(prices, monkeypatch):
     ],
 )
 def test_worker_failures_are_explicit(prices, monkeypatch, code, reason):
+    monkeypatch.setattr(sandbox, "prepare_strategy_filter", lambda: lambda: None)
     monkeypatch.setattr(
         sandbox,
         "resource",
@@ -187,6 +204,7 @@ def test_worker_failures_are_explicit(prices, monkeypatch, code, reason):
         ),
         ({"success": False, "error": "invalid output"}, False, False, RuntimeError),
         ({"success": True, "signals": [0]}, False, False, ValueError),
+        ({"success": True, "signals": ["unexpected"]}, False, False, ValueError),
     ],
 )
 def test_parent_process_checks_worker_outcome(prices, monkeypatch, result, alive, empty, error):
@@ -200,7 +218,8 @@ def test_parent_process_checks_worker_outcome(prices, monkeypatch, result, alive
         exitcode=9,
     )
     queue = SimpleNamespace(empty=lambda: empty, get=lambda: result)
-    context = SimpleNamespace(Queue=lambda: queue, Process=lambda **kw: proc)
+    context = SimpleNamespace(Process=lambda **kw: proc)
+    monkeypatch.setattr(sandbox, "_ResultBuffer", lambda rows: queue)
     monkeypatch.setattr(sandbox, "resource", SimpleNamespace())
     monkeypatch.setattr(sandbox.multiprocessing, "get_context", lambda method: context)
     if error:
@@ -213,3 +232,44 @@ def test_parent_process_checks_worker_outcome(prices, monkeypatch, result, alive
         )
     assert joined
     assert bool(killed) == alive
+
+
+def test_strategy_shared_buffer_is_bounded():
+    result = sandbox._ResultBuffer(2)
+    assert result.empty()
+    result.put({"success": True, "signals": [-1, 1]})
+    assert result.get() == {"success": True, "signals": [-1, 1]}
+    result.put({"success": False, "error": "x" * 5000})
+    assert result.get()["success"] is False
+    result.buffer.value = b"[]"
+    with pytest.raises(ValueError, match="Invalid strategy response"):
+        result.get()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Requires a Linux kernel with seccomp")
+def test_kernel_filter_denies_files_and_network(tmp_path):
+    # Execute the policy in a disposable interpreter so pytest keeps its own I/O.
+    path = tmp_path / "readable.txt"
+    path.write_text("verification")
+    subprocess.run([sys.executable, __file__, str(path)], check=True, timeout=30)
+
+
+def _check_isolated_io(path):
+    import socket
+
+    from analystforge.quant.backtest.isolation import prepare_strategy_filter
+
+    install_filter = prepare_strategy_filter()
+    install_filter()
+    for operation in (lambda: os.open(path, os.O_RDONLY), socket.socket):
+        try:
+            operation()
+        except OSError as exc:
+            if exc.errno == errno.EPERM:
+                continue
+        os._exit(1)
+    os._exit(0)
+
+
+if __name__ == "__main__":
+    _check_isolated_io(sys.argv[1])

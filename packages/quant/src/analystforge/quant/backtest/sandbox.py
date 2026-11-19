@@ -10,13 +10,17 @@ from __future__ import annotations
 import ast
 import builtins
 import importlib
+import json
 import multiprocessing
+import os
 from collections.abc import Mapping
 from types import ModuleType
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from .isolation import prepare_strategy_filter
 
 resource: ModuleType | None
 try:
@@ -31,6 +35,28 @@ class SandboxSecurityError(PermissionError):
 
 class SandboxUnavailableError(RuntimeError):
     """Raised when sandbox execution is attempted on an unsupported platform (e.g. Windows)."""
+
+
+class _ResultBuffer:
+    """A bounded, shared byte array. The child cannot supply a pickle to the parent."""
+
+    def __init__(self, rows: int) -> None:
+        self.buffer = multiprocessing.RawArray("c", 4096 + rows * 24)
+
+    def put(self, result: dict[str, Any]) -> None:
+        encoded = json.dumps(result, separators=(",", ":")).encode()
+        if len(encoded) >= len(self.buffer):
+            encoded = b'{"success":false,"error":"Strategy output exceeded the buffer limit."}'
+        self.buffer.value = encoded
+
+    def empty(self) -> bool:
+        return bool(self.buffer[0] == b"\x00")
+
+    def get(self) -> dict[str, Any]:
+        result = json.loads(self.buffer.value)
+        if not isinstance(result, dict):
+            raise ValueError("Invalid strategy response.")
+        return result
 
 
 ALLOWED_MODULES = {"math", "numpy", "np", "pandas", "pd", "scipy"}
@@ -175,7 +201,7 @@ def scan_code_ast(source_code: str) -> None:
 def _worker_execute(
     source_code: str,
     df: pd.DataFrame,
-    result_queue: multiprocessing.Queue[Any],
+    result_buffer: _ResultBuffer,
     cpu_limit_secs: int = 5,
     mem_limit_mb: int = 512,
 ) -> None:
@@ -183,6 +209,12 @@ def _worker_execute(
     try:
         if resource is None:
             raise SandboxUnavailableError("Unix resource limits are unavailable.")
+        try:
+            install_filter = prepare_strategy_filter()
+        except (ImportError, OSError, RuntimeError, ValueError, AttributeError) as exc:
+            raise SandboxUnavailableError(
+                "Required Linux syscall isolation is unavailable."
+            ) from exc
         try:
             mem_bytes = mem_limit_mb * 1024 * 1024
             # NumPy reserves virtual address space beyond the private data segment.
@@ -194,6 +226,14 @@ def _worker_execute(
         except (AttributeError, OSError, ValueError) as exc:
             raise SandboxUnavailableError(
                 "Required Unix resource limits could not be installed."
+            ) from exc
+
+        # Apply the filter only after Python, dependencies and shared memory are initialized.
+        try:
+            install_filter()
+        except (ImportError, OSError, RuntimeError, ValueError, AttributeError) as exc:
+            raise SandboxUnavailableError(
+                "Required Linux syscall isolation could not be installed."
             ) from exc
 
         # Build clean execution environment
@@ -218,18 +258,27 @@ def _worker_execute(
 
         if isinstance(signals, (pd.Series, np.ndarray, list, tuple)):
             raw_arr = np.asarray(signals, dtype=int).tolist()
-            result_queue.put({"success": True, "signals": raw_arr})
+            result_buffer.put({"success": True, "signals": raw_arr})
         else:
-            result_queue.put(
+            result_buffer.put(
                 {
                     "success": False,
                     "error": f"generate_signals returned unsupported type {type(signals).__name__}, expected Series or array",
                 }
             )
     except SandboxUnavailableError as exc:
-        result_queue.put({"success": False, "unavailable": True, "error": str(exc)})
+        result_buffer.put({"success": False, "unavailable": True, "error": str(exc)})
     except Exception as exc:
-        result_queue.put({"success": False, "error": f"{type(exc).__name__}: {exc}"})
+        result_buffer.put({"success": False, "error": f"{type(exc).__name__}: {exc}"})
+
+
+def _strategy_child(
+    source: str, df: pd.DataFrame, result: _ResultBuffer, cpu: int, memory: int
+) -> None:
+    os.environ.clear()
+    # Load the approved top-level scientific modules before filesystem access is closed.
+    importlib.import_module("scipy")
+    _worker_execute(source, df, result, cpu, memory)
 
 
 def run_sandboxed_strategy(
@@ -266,11 +315,11 @@ def run_sandboxed_strategy(
 
     # Step 2: Spawn isolated subprocess
     ctx = multiprocessing.get_context("spawn")
-    queue: multiprocessing.Queue[Any] = ctx.Queue()
+    result_buffer = _ResultBuffer(len(df))
 
     proc = ctx.Process(
-        target=_worker_execute,
-        args=(source_code, df, queue, cpu_limit_secs, mem_limit_mb),
+        target=_strategy_child,
+        args=(source_code, df, result_buffer, cpu_limit_secs, mem_limit_mb),
     )
     proc.start()
 
@@ -283,13 +332,13 @@ def run_sandboxed_strategy(
             f"Strategy execution exceeded wall-time limit of {wall_time_timeout} seconds."
         )
 
-    if queue.empty():
+    if result_buffer.empty():
         exit_code = proc.exitcode
         raise RuntimeError(
             f"Strategy worker process terminated unexpectedly with exit code {exit_code}."
         )
 
-    res = queue.get()
+    res = result_buffer.get()
     if not res.get("success"):
         err_msg = res.get("error", "Unknown error in strategy execution")
         if res.get("unavailable"):
@@ -297,6 +346,8 @@ def run_sandboxed_strategy(
         raise RuntimeError(err_msg)
 
     signals: list[int] = res["signals"]
+    if not isinstance(signals, list) or any(type(value) is not int for value in signals):
+        raise ValueError("Strategy must return a list of integer signals.")
     if len(signals) != len(df):
         raise ValueError(
             f"Strategy returned {len(signals)} signals, but price dataframe has {len(df)} rows."

@@ -165,6 +165,15 @@ jobs:
           curl -fsS -D "$RUNNER_TEMP/web-headers" http://127.0.0.1:8080/ -o "$RUNNER_TEMP/index.html"
           grep -qi 'content-security-policy:' "$RUNNER_TEMP/web-headers"
           grep -q 'id="root"' "$RUNNER_TEMP/index.html"
+      - name: Run a strategy inside the API image
+        run: |
+          docker compose exec -T api python -c '
+          import pandas as pd
+          from analystforge.quant.backtest.sandbox import run_sandboxed_strategy
+          frame = pd.DataFrame({"close": [1.0, 2.0]})
+          signals = run_sandboxed_strategy("def generate_signals(df): return [0, 1]", frame)
+          assert signals == [0, 1]
+          '
       - if: always()
         run: docker compose down --volumes
 

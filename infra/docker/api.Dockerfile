@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM cgr.dev/chainguard/wolfi-base AS python-runtime
 RUN apk upgrade --no-cache \
-    && apk add --no-cache python-3.12 ca-certificates-bundle libstdc++ libgomp
+    && apk add --no-cache python-3.12 ca-certificates-bundle libstdc++ libgomp libseccomp
 
 FROM python-runtime AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.13.8 /uv /usr/local/bin/uv
